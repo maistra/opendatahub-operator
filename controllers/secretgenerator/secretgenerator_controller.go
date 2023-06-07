@@ -3,6 +3,7 @@ package secretgenerator
 import (
 	"context"
 	"fmt"
+	secretgen "github.com/opendatahub-io/opendatahub-operator/pkg/secret"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"time"
 
@@ -43,7 +44,7 @@ func (r *SecretGeneratorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch only new secrets with the corresponding annotation
 	predicates := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			if _, found := e.Object.GetAnnotations()[SECRET_NAME_ANNOTATION]; found {
+			if _, found := e.Object.GetAnnotations()[secretgen.SecretNameAnnotation]; found {
 				return true
 			}
 			return false
@@ -52,7 +53,7 @@ func (r *SecretGeneratorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			if _, found := e.Object.GetAnnotations()[SECRET_NAME_ANNOTATION]; found {
+			if _, found := e.Object.GetAnnotations()[secretgen.SecretNameAnnotation]; found {
 				return true
 			}
 			return false
@@ -111,9 +112,9 @@ func (r *SecretGeneratorReconciler) Reconcile(ctx context.Context, request ctrl.
 			secGenLog.Info("Generating a random value for a secret in a namespace",
 				"secret", generatedSecret.Name, "namespace", generatedSecret.Namespace)
 
-			secret, err := newSecret(foundSecret.GetAnnotations())
+			secret, err := secretgen.NewSecretFrom(foundSecret.GetAnnotations())
 			if err != nil {
-				secGenLog.Error(err, "error creating secret")
+				secGenLog.Error(err, "error generating secret")
 				return ctrl.Result{}, err
 			}
 

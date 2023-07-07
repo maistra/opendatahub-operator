@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"regexp"
@@ -85,6 +86,10 @@ func (ossm *Ossm) Init(resources kftypesv3.ResourceEnum) error {
 		return internalError(err)
 	}
 
+	if err := ossm.migrateDSProjects(); err != nil {
+		return internalError(err)
+	}
+
 	if err := ossm.processManifests(); err != nil {
 		return internalError(err)
 	}
@@ -147,6 +152,42 @@ func (ossm *Ossm) createConfigMap(cfgMapName string, data map[string]string) err
 		}
 	} else {
 		return err
+	}
+
+	return nil
+}
+
+func (ossm *Ossm) migrateDSProjects() error {
+
+	client, err := clientset.NewForConfig(ossm.config)
+	if err != nil {
+		return err
+	}
+
+	// Define the selector to find the namespaces we are interested in
+	selector := labels.SelectorFromSet(labels.Set{"opendatahub.io/dashboard": "true"})
+
+	// List the namespaces with the specific label
+	namespaces, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return fmt.Errorf("failed to get namespaces: %v", err)
+	}
+
+	// Iterate over the namespaces and add or update the annotation
+	for _, ns := range namespaces.Items {
+		// Define the annotation to be added
+		annotations := ns.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations["opendatahub.io/service-mesh"] = "true"
+		ns.SetAnnotations(annotations)
+
+		// Update the namespace with the new annotation
+		_, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update namespace %s: %v", ns.GetName(), err)
+		}
 	}
 
 	return nil

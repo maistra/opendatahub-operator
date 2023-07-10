@@ -12,12 +12,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"regexp"
 	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
+	"time"
 )
 
 const (
@@ -94,6 +97,8 @@ func (ossm *Ossm) Init(resources kftypesv3.ResourceEnum) error {
 	if err := ossm.processManifests(); err != nil {
 		return internalError(err)
 	}
+
+	ossm.waitForRouteAndDelete(ossm.KfConfig.Namespace, "odh-dashboard")
 
 	return nil
 }
@@ -188,6 +193,47 @@ func (ossm *Ossm) migrateDSProjects() error {
 	}
 
 	return result.ErrorOrNil()
+}
+
+// waitForRouteAndDelete uses a goroutine to wait for a route to be created and delete it
+// we need to use this to delete the old odh-dashboard route as it can't currently be deleted by patches.
+func (ossm *Ossm) waitForRouteAndDelete(namespace string, routeName string) {
+	dynamicClient, err := dynamic.NewForConfig(ossm.config)
+	if err != nil {
+		log.Error(err, "Failed to create dynamic client")
+		return
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "route.openshift.io",
+		Version:  "v1",
+		Resource: "routes",
+	}
+
+	go func() {
+		for {
+			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), routeName, metav1.GetOptions{})
+
+			if err != nil {
+				if k8serrors.IsNotFound(err) {
+					time.Sleep(time.Second * 10)
+					continue
+				} else {
+					log.Error(err, "Failed to get route")
+					return
+				}
+			}
+
+			err = dynamicClient.Resource(gvr).Namespace(namespace).Delete(context.Background(), routeName, metav1.DeleteOptions{})
+			if err != nil {
+				log.Error(err, "Failed to delete route")
+				return
+			}
+
+			// The route has been deleted, break the loop
+			break
+		}
+	}()
 }
 
 // TODO handle delete

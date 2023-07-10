@@ -190,7 +190,6 @@ func (ossm *Ossm) migrateDSProjects() error {
 		}
 	}
 
-	// Return the error(s) if any
 	return result.ErrorOrNil()
 }
 

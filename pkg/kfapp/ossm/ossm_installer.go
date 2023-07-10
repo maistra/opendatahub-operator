@@ -165,7 +165,6 @@ func (ossm *Ossm) migrateDSProjects() error {
 		return err
 	}
 
-	// Define the selector to find the namespaces we are interested in
 	selector := labels.SelectorFromSet(labels.Set{"opendatahub.io/dashboard": "true"})
 
 	// List the namespaces with the specific label

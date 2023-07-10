@@ -178,7 +178,6 @@ func (ossm *Ossm) migrateDSProjects() error {
 	var result *multierror.Error
 
 	for _, ns := range namespaces.Items {
-		// Define the annotation to be added
 		annotations := ns.GetAnnotations()
 		if annotations == nil {
 			annotations = map[string]string{}

@@ -3,6 +3,7 @@ package ossm
 import (
 	"context"
 	"fmt"
+	multierror "github.com/hashicorp/go-multierror"
 	kfapisv3 "github.com/opendatahub-io/opendatahub-operator/apis"
 	kftypesv3 "github.com/opendatahub-io/opendatahub-operator/apis/apps"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig"
@@ -96,11 +97,6 @@ func (ossm *Ossm) Init(resources kftypesv3.ResourceEnum) error {
 		return internalError(err)
 	}
 
-	// If there was an error with migrateDSProjects, return it here
-	if dsErr != nil {
-		return internalError(dsErr)
-	}
-
 	return nil
 }
 
@@ -180,7 +176,9 @@ func (ossm *Ossm) migrateDSProjects() error {
 		return fmt.Errorf("failed to get namespaces: %v", err)
 	}
 
-	var errs []string
+	// Initialize multierror
+	var result *multierror.Error
+
 	// Iterate over the namespaces and add or update the annotation
 	for _, ns := range namespaces.Items {
 		// Define the annotation to be added
@@ -194,16 +192,14 @@ func (ossm *Ossm) migrateDSProjects() error {
 		// Update the namespace with the new annotation
 		_, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("failed to update namespace %s: %v", ns.GetName(), err))
+			// Add the error to multierror
+			result = multierror.Append(result, fmt.Errorf("failed to update namespace %s: %v", ns.GetName(), err))
 			continue
 		}
 	}
 
-	if len(errs) > 0 {
-		return errors.New(strings.Join(errs, "\n"))
-	}
-
-	return nil
+	// Return the error(s) if any
+	return result.ErrorOrNil()
 }
 
 // TODO handle delete

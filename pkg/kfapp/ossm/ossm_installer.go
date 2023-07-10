@@ -87,10 +87,8 @@ func (ossm *Ossm) Init(resources kftypesv3.ResourceEnum) error {
 		return internalError(err)
 	}
 
-	var dsErr error
-	if dsErr = ossm.migrateDSProjects(); dsErr != nil {
-		// Just log the error here but don't return
-		log.Error(dsErr, "Error while migrating DS Projects")
+	if err := ossm.migrateDSProjects(); err != nil {
+		log.Error(err, "failed migrating Data Science Projects")
 	}
 
 	if err := ossm.processManifests(); err != nil {

@@ -86,12 +86,19 @@ func (ossm *Ossm) Init(resources kftypesv3.ResourceEnum) error {
 		return internalError(err)
 	}
 
-	if err := ossm.migrateDSProjects(); err != nil {
-		return internalError(err)
+	var dsErr error
+	if dsErr = ossm.migrateDSProjects(); dsErr != nil {
+		// Just log the error here but don't return
+		log.Error(dsErr, "Error while migrating DS Projects")
 	}
 
 	if err := ossm.processManifests(); err != nil {
 		return internalError(err)
+	}
+
+	// If there was an error with migrateDSProjects, return it here
+	if dsErr != nil {
+		return internalError(dsErr)
 	}
 
 	return nil
@@ -173,6 +180,7 @@ func (ossm *Ossm) migrateDSProjects() error {
 		return fmt.Errorf("failed to get namespaces: %v", err)
 	}
 
+	var errs []string
 	// Iterate over the namespaces and add or update the annotation
 	for _, ns := range namespaces.Items {
 		// Define the annotation to be added
@@ -186,8 +194,13 @@ func (ossm *Ossm) migrateDSProjects() error {
 		// Update the namespace with the new annotation
 		_, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to update namespace %s: %v", ns.GetName(), err)
+			errs = append(errs, fmt.Sprintf("failed to update namespace %s: %v", ns.GetName(), err))
+			continue
 		}
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "\n"))
 	}
 
 	return nil

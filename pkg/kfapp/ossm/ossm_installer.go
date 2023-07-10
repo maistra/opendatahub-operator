@@ -185,12 +185,8 @@ func (ossm *Ossm) migrateDSProjects() error {
 		annotations["opendatahub.io/service-mesh"] = "true"
 		ns.SetAnnotations(annotations)
 
-		// Update the namespace with the new annotation
-		_, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{})
-		if err != nil {
-			// Add the error to multierror
-			result = multierror.Append(result, fmt.Errorf("failed to update namespace %s: %v", ns.GetName(), err))
-			continue
+		if _, err := client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{}); err != nil {
+			result = multierror.Append(result, err)
 		}
 	}
 

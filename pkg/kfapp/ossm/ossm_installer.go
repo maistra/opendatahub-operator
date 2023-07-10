@@ -167,7 +167,6 @@ func (ossm *Ossm) migrateDSProjects() error {
 
 	selector := labels.SelectorFromSet(labels.Set{"opendatahub.io/dashboard": "true"})
 
-	// List the namespaces with the specific label
 	namespaces, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return fmt.Errorf("failed to get namespaces: %v", err)

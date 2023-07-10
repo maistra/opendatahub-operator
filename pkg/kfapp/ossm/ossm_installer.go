@@ -174,7 +174,6 @@ func (ossm *Ossm) migrateDSProjects() error {
 		return fmt.Errorf("failed to get namespaces: %v", err)
 	}
 
-	// Initialize multierror
 	var result *multierror.Error
 
 	for _, ns := range namespaces.Items {

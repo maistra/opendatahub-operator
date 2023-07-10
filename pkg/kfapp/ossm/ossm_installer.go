@@ -177,7 +177,6 @@ func (ossm *Ossm) migrateDSProjects() error {
 	// Initialize multierror
 	var result *multierror.Error
 
-	// Iterate over the namespaces and add or update the annotation
 	for _, ns := range namespaces.Items {
 		// Define the annotation to be added
 		annotations := ns.GetAnnotations()

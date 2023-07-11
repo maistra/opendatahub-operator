@@ -47,6 +47,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
@@ -64,6 +66,10 @@ type DataScienceClusterReconciler struct {
 type DataScienceClusterConfig struct {
 	DSCISpec *dsci.DSCInitializationSpec
 }
+
+const (
+	finalizerName = "datasciencecluster.opendatahub.io/finalizer"
+)
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -90,11 +96,29 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	instance := &instances.Items[0]
 
-	if instance.GetDeletionTimestamp() != nil {
+	var err error
+
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(instance, finalizerName) {
+			r.Log.Info("Adding finalizer for DataScienceCluster", "name", instance.Name, "namespace", instance.Namespace, "finalizer", finalizerName)
+			controllerutil.AddFinalizer(instance, finalizerName)
+			if err := r.Update(ctx, instance); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		r.Log.Info("Finalization DataScienceCluster start deleting instance", "name", instance.Name, "namespace", instance.Namespace, "finalizer", finalizerName)
+		// put cleanup logic here
+		if controllerutil.ContainsFinalizer(instance, finalizerName) {
+			controllerutil.RemoveFinalizer(instance, finalizerName)
+			if err := r.Update(ctx, instance); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
 		return ctrl.Result{}, nil
 	}
 
-	var err error
 	// Start reconciling
 	if instance.Status.Conditions == nil {
 		reason := status.ReconcileInit

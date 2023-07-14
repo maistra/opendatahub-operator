@@ -13,9 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,8 +28,6 @@ const (
 )
 
 var log = ctrlLog.Log.WithName(PluginName)
-
-type cleanup func() error
 
 type OssmInstaller struct {
 	*kfconfig.KfConfig
@@ -113,7 +109,7 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(err)
 	}
 
-	o.cleanupFuncs = append(o.cleanupFuncs, func() error {
+	o.registerCleanup(func() error {
 		c, err := dynamic.NewForConfig(o.config)
 		if err != nil {
 			return err
@@ -132,61 +128,6 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		}
 
 		log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
-		return err
-	})
-
-	return nil
-}
-
-func (o *OssmInstaller) createResourceTracker() error {
-	tracker := &v1alpha1.OssmResourceTracker{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "ossm.plugins.kubeflow.org/v1alpha1",
-			Kind:       "OssmResourceTracker",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: o.KfConfig.Name + "." + o.KfConfig.Namespace,
-		},
-	}
-
-	c, err := dynamic.NewForConfig(o.config)
-	if err != nil {
-		return err
-	}
-
-	gvr := schema.GroupVersionResource{
-		Group:    "ossm.plugins.kubeflow.org",
-		Version:  "v1alpha1",
-		Resource: "ossmresourcetrackers",
-	}
-
-	foundTracker, err := c.Resource(gvr).Get(context.Background(), tracker.Name, metav1.GetOptions{})
-	if k8serrors.IsNotFound(err) {
-		unstructuredTracker, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tracker)
-		if err != nil {
-			return err
-		}
-
-		u := unstructured.Unstructured{Object: unstructuredTracker}
-
-		foundTracker, err = c.Resource(gvr).Create(context.Background(), &u, metav1.CreateOptions{})
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	}
-
-	o.tracker = &v1alpha1.OssmResourceTracker{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(foundTracker.Object, o.tracker); err != nil {
-		return err
-	}
-
-	o.cleanupFuncs = append(o.cleanupFuncs, func() error {
-		err := c.Resource(gvr).Delete(context.Background(), o.tracker.Name, metav1.DeleteOptions{})
-		if k8serrors.IsNotFound(err) {
-			return nil
-		}
 		return err
 	})
 
@@ -291,15 +232,6 @@ func (o *OssmInstaller) MigrateDSProjects() error {
 	}
 
 	return result.ErrorOrNil()
-}
-
-func (o *OssmInstaller) CleanupOwnedResources() error {
-	var cleanupErrors *multierror.Error
-	for _, cleanupFunc := range o.cleanupFuncs {
-		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc())
-	}
-
-	return cleanupErrors.ErrorOrNil()
 }
 
 func internalError(err error) error {

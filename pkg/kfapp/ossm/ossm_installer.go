@@ -63,10 +63,10 @@ func (o *OssmInstaller) GetPluginSpec() (*ossmplugin.OssmPluginSpec, error) {
 
 func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 	if o.KfConfig.Spec.SkipInitProject {
-		log.Info("Skipping init phase")
+		log.Info("Skipping init phase", "plugin", PluginName)
 	}
 
-	log.Info("Initializing " + PluginName)
+	log.Info("Initializing", "plugin", PluginName)
 	pluginSpec, err := o.GetPluginSpec()
 	if err != nil {
 		return internalError(errors.WithStack(err))

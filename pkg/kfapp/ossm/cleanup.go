@@ -24,7 +24,7 @@ func (o *OssmInstaller) CleanupOwnedResources() error {
 	return cleanupErrors.ErrorOrNil()
 }
 
-func (o *OssmInstaller) registerCleanup(cleanupFunc ...cleanup) {
+func (o *OssmInstaller) onCleanup(cleanupFunc ...cleanup) {
 	o.cleanupFuncs = append(o.cleanupFuncs, cleanupFunc...)
 }
 
@@ -75,7 +75,7 @@ func (o *OssmInstaller) createResourceTracker() error {
 		return err
 	}
 
-	o.registerCleanup(func() error {
+	o.onCleanup(func() error {
 		err := c.Resource(gvr).Delete(context.Background(), o.tracker.Name, metav1.DeleteOptions{})
 		if k8serrors.IsNotFound(err) {
 			return nil
@@ -87,6 +87,7 @@ func (o *OssmInstaller) createResourceTracker() error {
 }
 
 func (o *OssmInstaller) ingressVolumesRemoval() cleanup {
+
 	return func() error {
 		spec, err := o.GetPluginSpec()
 		if err != nil {
@@ -156,6 +157,7 @@ func (o *OssmInstaller) ingressVolumesRemoval() cleanup {
 }
 
 func (o *OssmInstaller) oauthClientRemoval() func() error {
+
 	return func() error {
 		c, err := dynamic.NewForConfig(o.config)
 		if err != nil {
@@ -169,12 +171,80 @@ func (o *OssmInstaller) oauthClientRemoval() func() error {
 			Resource: "oauthclients",
 		}
 
-		err = c.Resource(gvr).Delete(context.Background(), oauthClientName, metav1.DeleteOptions{})
-		if k8serrors.IsNotFound(err) {
+		if _, err := c.Resource(gvr).Get(context.Background(), oauthClientName, metav1.GetOptions{}); err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		if err := c.Resource(gvr).Delete(context.Background(), oauthClientName, metav1.DeleteOptions{}); err != nil {
+			log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
+			return err
+		}
+
+		return nil
+	}
+}
+
+func (o *OssmInstaller) externalAuthzProviderRemoval() cleanup {
+
+	return func() error {
+		spec, err := o.GetPluginSpec()
+		if err != nil {
+			return err
+		}
+
+		ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", o.KfConfig.Namespace)
+
+		dynamicClient, err := dynamic.NewForConfig(o.config)
+		if err != nil {
+			return err
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    "maistra.io",
+			Version:  "v2",
+			Resource: "servicemeshcontrolplanes",
+		}
+
+		smcp, err := dynamicClient.Resource(gvr).Namespace(spec.Mesh.Namespace).Get(context.Background(), spec.Mesh.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		extensionProviders, found, err := unstructured.NestedSlice(smcp.Object, "spec", "techPreview", "meshConfig", "extensionProviders")
+		if err != nil {
+			return err
+		}
+		if !found {
+			log.Info("no extension providers found", "smcp", spec.Mesh.Name, "istio-ns", spec.Mesh.Namespace)
 			return nil
 		}
 
-		log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
-		return err
+		for i, v := range extensionProviders {
+			extensionProvider, ok := v.(map[string]interface{})
+			if !ok {
+				fmt.Println("Unexpected type for extensionProvider")
+				continue
+			}
+
+			if extensionProvider["name"] == ossmAuthzProvider {
+				extensionProviders = append(extensionProviders[:i], extensionProviders[i+1:]...)
+				err = unstructured.SetNestedSlice(smcp.Object, extensionProviders, "spec", "techPreview", "meshConfig", "extensionProviders")
+				if err != nil {
+					return err
+				}
+				break
+			}
+		}
+
+		_, err = dynamicClient.Resource(gvr).Namespace(spec.Mesh.Namespace).Update(context.Background(), smcp, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 }

@@ -116,7 +116,11 @@ func (o *OssmInstaller) Generate(resources kftypesv3.ResourceEnum) error {
 		return internalError(errors.WithStack(err))
 	}
 
-	o.registerCleanup(o.oauthClientRemoval(), o.ingressVolumesRemoval())
+	o.onCleanup(
+		o.oauthClientRemoval(),
+		o.ingressVolumesRemoval(),
+		o.externalAuthzProviderRemoval(),
+	)
 
 	return nil
 }

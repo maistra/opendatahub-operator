@@ -21,7 +21,7 @@ import (
 
 var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-func (ossm *Ossm) createSelfSignedCerts(addr string, objectMeta metav1.ObjectMeta) error {
+func (o *OssmInstaller) createSelfSignedCerts(addr string, objectMeta metav1.ObjectMeta) error {
 
 	cert, key, err := generateCertificate(addr)
 	if err != nil {
@@ -30,10 +30,10 @@ func (ossm *Ossm) createSelfSignedCerts(addr string, objectMeta metav1.ObjectMet
 
 	objectMeta.SetOwnerReferences([]metav1.OwnerReference{
 		{
-			APIVersion: ossm.tracker.APIVersion,
-			Kind:       ossm.tracker.Kind,
-			Name:       ossm.tracker.Name,
-			UID:        ossm.tracker.UID,
+			APIVersion: o.tracker.APIVersion,
+			Kind:       o.tracker.Kind,
+			Name:       o.tracker.Name,
+			UID:        o.tracker.UID,
 		},
 	})
 
@@ -45,7 +45,7 @@ func (ossm *Ossm) createSelfSignedCerts(addr string, objectMeta metav1.ObjectMet
 		},
 	}
 
-	clientset, err := kubernetes.NewForConfig(ossm.config)
+	clientset, err := kubernetes.NewForConfig(o.config)
 	if err != nil {
 		return errors.WithStack(err)
 	}

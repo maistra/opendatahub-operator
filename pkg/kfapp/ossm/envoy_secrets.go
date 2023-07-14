@@ -30,7 +30,7 @@ resources:
       inline_bytes: "{{ .Secret }}"
 `
 
-func (ossm *Ossm) createEnvoySecret(oAuth oAuth, objectMeta metav1.ObjectMeta) error {
+func (o *OssmInstaller) createEnvoySecret(oAuth oAuth, objectMeta metav1.ObjectMeta) error {
 
 	clientSecret, err := processInlineTemplate(tokenSecret, struct{ Secret string }{Secret: oAuth.ClientSecret})
 	if err != nil {
@@ -44,10 +44,10 @@ func (ossm *Ossm) createEnvoySecret(oAuth oAuth, objectMeta metav1.ObjectMeta) e
 
 	objectMeta.SetOwnerReferences([]metav1.OwnerReference{
 		{
-			APIVersion: ossm.tracker.APIVersion,
-			Kind:       ossm.tracker.Kind,
-			Name:       ossm.tracker.Name,
-			UID:        ossm.tracker.UID,
+			APIVersion: o.tracker.APIVersion,
+			Kind:       o.tracker.Kind,
+			Name:       o.tracker.Name,
+			UID:        o.tracker.UID,
 		},
 	})
 
@@ -59,7 +59,7 @@ func (ossm *Ossm) createEnvoySecret(oAuth oAuth, objectMeta metav1.ObjectMeta) e
 		},
 	}
 
-	clientset, err := kubernetes.NewForConfig(ossm.config)
+	clientset, err := kubernetes.NewForConfig(o.config)
 	if err != nil {
 		return errors.WithStack(err)
 	}

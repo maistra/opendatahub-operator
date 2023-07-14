@@ -22,11 +22,11 @@ var _ = When("Migrating Data Science Projects", func() {
 
 	var (
 		objectCleaner *testenv.Cleaner
-		ossmPlugin    *ossm.Ossm
+		ossmPlugin    *ossm.OssmInstaller
 	)
 
 	BeforeEach(func() {
-		ossmPlugin = ossm.NewOssm(&kfconfig.KfConfig{}, envTest.Config)
+		ossmPlugin = ossm.NewOssmInstaller(&kfconfig.KfConfig{}, envTest.Config)
 		objectCleaner = testenv.CreateCleaner(cli, envTest.Config, timeout, interval)
 	})
 

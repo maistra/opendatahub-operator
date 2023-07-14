@@ -482,7 +482,7 @@ func (kfapp *coordinator) Delete(resources kftypesv3.ResourceEnum) error {
 				Message: "Platform OSSM specified but not loaded.",
 			}
 		} else {
-			ossmInstaller := p.(*ossm.Ossm)
+			ossmInstaller := p.(*ossm.OssmInstaller)
 			return ossmInstaller.CleanupOwnedResources()
 		}
 	}

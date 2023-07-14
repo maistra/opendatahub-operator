@@ -33,7 +33,7 @@ var log = ctrlLog.Log.WithName(PluginName)
 
 type cleanup func() error
 
-type Ossm struct {
+type OssmInstaller struct {
 	*kfconfig.KfConfig
 	pluginSpec   *ossmplugin.OssmPluginSpec
 	config       *rest.Config
@@ -42,8 +42,8 @@ type Ossm struct {
 	cleanupFuncs []cleanup
 }
 
-func NewOssm(kfConfig *kfconfig.KfConfig, restConfig *rest.Config) *Ossm {
-	return &Ossm{
+func NewOssmInstaller(kfConfig *kfconfig.KfConfig, restConfig *rest.Config) *OssmInstaller {
+	return &OssmInstaller{
 		KfConfig: kfConfig,
 		config:   restConfig,
 	}
@@ -52,28 +52,28 @@ func NewOssm(kfConfig *kfconfig.KfConfig, restConfig *rest.Config) *Ossm {
 
 // GetPlatform returns the ossm kfapp. It's called by coordinator.GetPlatform
 func GetPlatform(kfConfig *kfconfig.KfConfig) (kftypesv3.Platform, error) {
-	return NewOssm(kfConfig, kftypesv3.GetConfig()), nil
+	return NewOssmInstaller(kfConfig, kftypesv3.GetConfig()), nil
 }
 
 // GetPluginSpec gets the plugin spec.
-func (ossm *Ossm) GetPluginSpec() (*ossmplugin.OssmPluginSpec, error) {
-	if ossm.pluginSpec != nil {
-		return ossm.pluginSpec, nil
+func (o *OssmInstaller) GetPluginSpec() (*ossmplugin.OssmPluginSpec, error) {
+	if o.pluginSpec != nil {
+		return o.pluginSpec, nil
 	}
 
-	ossm.pluginSpec = &ossmplugin.OssmPluginSpec{}
-	err := ossm.KfConfig.GetPluginSpec(PluginName, ossm.pluginSpec)
+	o.pluginSpec = &ossmplugin.OssmPluginSpec{}
+	err := o.KfConfig.GetPluginSpec(PluginName, o.pluginSpec)
 
-	return ossm.pluginSpec, err
+	return o.pluginSpec, err
 }
 
-func (ossm *Ossm) Init(_ kftypesv3.ResourceEnum) error {
-	if ossm.KfConfig.Spec.SkipInitProject {
+func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
+	if o.KfConfig.Spec.SkipInitProject {
 		log.Info("Skipping init phase")
 	}
 
 	log.Info("Initializing " + PluginName)
-	pluginSpec, err := ossm.GetPluginSpec()
+	pluginSpec, err := o.GetPluginSpec()
 	if err != nil {
 		return internalError(errors.WithStack(err))
 	}
@@ -86,11 +86,11 @@ func (ossm *Ossm) Init(_ kftypesv3.ResourceEnum) error {
 
 	// TODO ensure operators are installed
 
-	if err := ossm.createResourceTracker(); err != nil {
+	if err := o.createResourceTracker(); err != nil {
 		return internalError(err)
 	}
 
-	if err := ossm.createConfigMap("service-mesh-refs",
+	if err := o.createConfigMap("service-mesh-refs",
 		map[string]string{
 			"CONTROL_PLANE_NAME": pluginSpec.Mesh.Name,
 			"MESH_NAMESPACE":     pluginSpec.Mesh.Namespace,
@@ -98,28 +98,28 @@ func (ossm *Ossm) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(err)
 	}
 
-	if err := ossm.createConfigMap("auth-refs",
+	if err := o.createConfigMap("auth-refs",
 		map[string]string{
 			"AUTHORINO_LABEL": pluginSpec.Auth.Authorino.Label,
 		}); err != nil {
 		return internalError(err)
 	}
 
-	if err := ossm.MigrateDSProjects(); err != nil {
+	if err := o.MigrateDSProjects(); err != nil {
 		log.Error(err, "failed migrating Data Science Projects")
 	}
 
-	if err := ossm.processManifests(); err != nil {
+	if err := o.processManifests(); err != nil {
 		return internalError(err)
 	}
 
-	ossm.cleanupFuncs = append(ossm.cleanupFuncs, func() error {
-		c, err := dynamic.NewForConfig(ossm.config)
+	o.cleanupFuncs = append(o.cleanupFuncs, func() error {
+		c, err := dynamic.NewForConfig(o.config)
 		if err != nil {
 			return err
 		}
 
-		oauthClientName := fmt.Sprintf("%s-oauth2-client", ossm.KfConfig.Namespace)
+		oauthClientName := fmt.Sprintf("%s-oauth2-client", o.KfConfig.Namespace)
 		gvr := schema.GroupVersionResource{
 			Group:    "oauth.openshift.io",
 			Version:  "v1",
@@ -138,18 +138,18 @@ func (ossm *Ossm) Init(_ kftypesv3.ResourceEnum) error {
 	return nil
 }
 
-func (ossm *Ossm) createResourceTracker() error {
+func (o *OssmInstaller) createResourceTracker() error {
 	tracker := &v1alpha1.OssmResourceTracker{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "ossm.plugins.kubeflow.org/v1alpha1",
 			Kind:       "OssmResourceTracker",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ossm.KfConfig.Name + "." + ossm.KfConfig.Namespace,
+			Name: o.KfConfig.Name + "." + o.KfConfig.Namespace,
 		},
 	}
 
-	c, err := dynamic.NewForConfig(ossm.config)
+	c, err := dynamic.NewForConfig(o.config)
 	if err != nil {
 		return err
 	}
@@ -177,13 +177,13 @@ func (ossm *Ossm) createResourceTracker() error {
 		return err
 	}
 
-	ossm.tracker = &v1alpha1.OssmResourceTracker{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(foundTracker.Object, ossm.tracker); err != nil {
+	o.tracker = &v1alpha1.OssmResourceTracker{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(foundTracker.Object, o.tracker); err != nil {
 		return err
 	}
 
-	ossm.cleanupFuncs = append(ossm.cleanupFuncs, func() error {
-		err := c.Resource(gvr).Delete(context.Background(), ossm.tracker.Name, metav1.DeleteOptions{})
+	o.cleanupFuncs = append(o.cleanupFuncs, func() error {
+		err := c.Resource(gvr).Delete(context.Background(), o.tracker.Name, metav1.DeleteOptions{})
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
@@ -193,9 +193,9 @@ func (ossm *Ossm) createResourceTracker() error {
 	return nil
 }
 
-func (ossm *Ossm) Generate(resources kftypesv3.ResourceEnum) error {
+func (o *OssmInstaller) Generate(resources kftypesv3.ResourceEnum) error {
 	// TODO sort by Kind as .Apply does
-	if err := ossm.applyManifests(); err != nil {
+	if err := o.applyManifests(); err != nil {
 		return internalError(errors.WithStack(err))
 	}
 
@@ -218,25 +218,25 @@ func ExtractHostName(s string) string {
 	return withoutProtocol[:index]
 }
 
-func (ossm *Ossm) createConfigMap(cfgMapName string, data map[string]string) error {
+func (o *OssmInstaller) createConfigMap(cfgMapName string, data map[string]string) error {
 
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfgMapName,
-			Namespace: ossm.KfConfig.Namespace,
+			Namespace: o.KfConfig.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: ossm.tracker.APIVersion,
-					Kind:       ossm.tracker.Kind,
-					Name:       ossm.tracker.Name,
-					UID:        ossm.tracker.UID,
+					APIVersion: o.tracker.APIVersion,
+					Kind:       o.tracker.Kind,
+					Name:       o.tracker.Name,
+					UID:        o.tracker.UID,
 				},
 			},
 		},
 		Data: data,
 	}
 
-	client, err := clientset.NewForConfig(ossm.config)
+	client, err := clientset.NewForConfig(o.config)
 	if err != nil {
 		return err
 	}
@@ -261,9 +261,9 @@ func (ossm *Ossm) createConfigMap(cfgMapName string, data map[string]string) err
 	return nil
 }
 
-func (ossm *Ossm) MigrateDSProjects() error {
+func (o *OssmInstaller) MigrateDSProjects() error {
 
-	client, err := clientset.NewForConfig(ossm.config)
+	client, err := clientset.NewForConfig(o.config)
 	if err != nil {
 		return err
 	}
@@ -293,9 +293,9 @@ func (ossm *Ossm) MigrateDSProjects() error {
 	return result.ErrorOrNil()
 }
 
-func (ossm *Ossm) CleanupOwnedResources() error {
+func (o *OssmInstaller) CleanupOwnedResources() error {
 	var cleanupErrors *multierror.Error
-	for _, cleanupFunc := range ossm.cleanupFuncs {
+	for _, cleanupFunc := range o.cleanupFuncs {
 		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc())
 	}
 

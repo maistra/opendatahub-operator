@@ -36,12 +36,12 @@ const (
 	YamlSeparator = "(?m)^---[ \t]*$"
 )
 
-func (ossm *Ossm) CreateResourceFromFile(filename string, elems ...configtypes.NameValue) error {
+func (o *OssmInstaller) CreateResourceFromFile(filename string, elems ...configtypes.NameValue) error {
 	elemsMap := make(map[string]configtypes.NameValue)
 	for _, nv := range elems {
 		elemsMap[nv.Name] = nv
 	}
-	c, err := client.New(ossm.config, client.Options{})
+	c, err := client.New(o.config, client.Options{})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -73,10 +73,10 @@ func (ossm *Ossm) CreateResourceFromFile(filename string, elems ...configtypes.N
 
 		u.SetOwnerReferences([]metav1.OwnerReference{
 			{
-				APIVersion: ossm.tracker.APIVersion,
-				Kind:       ossm.tracker.Kind,
-				Name:       ossm.tracker.Name,
-				UID:        ossm.tracker.UID,
+				APIVersion: o.tracker.APIVersion,
+				Kind:       o.tracker.Kind,
+				Name:       o.tracker.Name,
+				UID:        o.tracker.UID,
 			},
 		})
 
@@ -99,13 +99,13 @@ func (ossm *Ossm) CreateResourceFromFile(filename string, elems ...configtypes.N
 	return nil
 }
 
-func (ossm *Ossm) PatchResourceFromFile(filename string, elems ...configtypes.NameValue) error {
+func (o *OssmInstaller) PatchResourceFromFile(filename string, elems ...configtypes.NameValue) error {
 	elemsMap := make(map[string]configtypes.NameValue)
 	for _, nv := range elems {
 		elemsMap[nv.Name] = nv
 	}
 
-	dynamicClient, err := dynamic.NewForConfig(ossm.config)
+	dynamicClient, err := dynamic.NewForConfig(o.config)
 	if err != nil {
 		return errors.WithStack(err)
 	}

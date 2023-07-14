@@ -14,8 +14,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"regexp"
@@ -109,28 +107,6 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(err)
 	}
 
-	o.registerCleanup(func() error {
-		c, err := dynamic.NewForConfig(o.config)
-		if err != nil {
-			return err
-		}
-
-		oauthClientName := fmt.Sprintf("%s-oauth2-client", o.KfConfig.Namespace)
-		gvr := schema.GroupVersionResource{
-			Group:    "oauth.openshift.io",
-			Version:  "v1",
-			Resource: "oauthclients",
-		}
-
-		err = c.Resource(gvr).Delete(context.Background(), oauthClientName, metav1.DeleteOptions{})
-		if k8serrors.IsNotFound(err) {
-			return nil
-		}
-
-		log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
-		return err
-	})
-
 	return nil
 }
 
@@ -139,6 +115,8 @@ func (o *OssmInstaller) Generate(resources kftypesv3.ResourceEnum) error {
 	if err := o.applyManifests(); err != nil {
 		return internalError(errors.WithStack(err))
 	}
+
+	o.registerCleanup(o.oauthClientRemoval(), o.ingressVolumesRemoval())
 
 	return nil
 }

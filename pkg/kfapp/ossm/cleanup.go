@@ -2,6 +2,7 @@ package ossm
 
 import (
 	"context"
+	"fmt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opendatahub-io/opendatahub-operator/apis/ossm.plugins.kubeflow.org/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,8 +24,8 @@ func (o *OssmInstaller) CleanupOwnedResources() error {
 	return cleanupErrors.ErrorOrNil()
 }
 
-func (o *OssmInstaller) registerCleanup(cleanupFunc cleanup) {
-	o.cleanupFuncs = append(o.cleanupFuncs, cleanupFunc)
+func (o *OssmInstaller) registerCleanup(cleanupFunc ...cleanup) {
+	o.cleanupFuncs = append(o.cleanupFuncs, cleanupFunc...)
 }
 
 // createResourceTracker instantiates OssmResourceTracker for given KfDef application in a namespce.
@@ -83,4 +84,97 @@ func (o *OssmInstaller) createResourceTracker() error {
 	})
 
 	return nil
+}
+
+func (o *OssmInstaller) ingressVolumesRemoval() cleanup {
+	return func() error {
+		spec, err := o.GetPluginSpec()
+		if err != nil {
+			return err
+		}
+
+		tokenVolume := fmt.Sprintf("%s-oauth2-tokens", o.KfConfig.Namespace)
+
+		dynamicClient, err := dynamic.NewForConfig(o.config)
+		if err != nil {
+			return err
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    "maistra.io",
+			Version:  "v2",
+			Resource: "servicemeshcontrolplanes",
+		}
+
+		smcp, err := dynamicClient.Resource(gvr).Namespace(spec.Mesh.Namespace).Get(context.Background(), spec.Mesh.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		volumes, found, err := unstructured.NestedSlice(smcp.Object, "spec", "gateways", "ingress", "volumes")
+		if err != nil {
+			return err
+		}
+		if !found {
+			log.Info("no volumes found", "smcp", spec.Mesh.Name, "istio-ns", spec.Mesh.Namespace)
+			return nil
+		}
+
+		for i, v := range volumes {
+			volume, ok := v.(map[string]interface{})
+			if !ok {
+				fmt.Println("Unexpected type for volume")
+				continue
+			}
+
+			volumeMount, found, err := unstructured.NestedMap(volume, "volumeMount")
+			if err != nil {
+				return err
+			}
+			if !found {
+				fmt.Println("No volumeMount found in the volume")
+				continue
+			}
+
+			if volumeMount["name"] == tokenVolume {
+				volumes = append(volumes[:i], volumes[i+1:]...)
+				err = unstructured.SetNestedSlice(smcp.Object, volumes, "spec", "gateways", "ingress", "volumes")
+				if err != nil {
+					return err
+				}
+				break
+			}
+		}
+
+		_, err = dynamicClient.Resource(gvr).Namespace(spec.Mesh.Namespace).Update(context.Background(), smcp, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+}
+
+func (o *OssmInstaller) oauthClientRemoval() func() error {
+	return func() error {
+		c, err := dynamic.NewForConfig(o.config)
+		if err != nil {
+			return err
+		}
+
+		oauthClientName := fmt.Sprintf("%s-oauth2-client", o.KfConfig.Namespace)
+		gvr := schema.GroupVersionResource{
+			Group:    "oauth.openshift.io",
+			Version:  "v1",
+			Resource: "oauthclients",
+		}
+
+		err = c.Resource(gvr).Delete(context.Background(), oauthClientName, metav1.DeleteOptions{})
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+
+		log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
+		return err
+	}
 }

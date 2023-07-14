@@ -6,7 +6,6 @@ import (
 	configtypes "github.com/opendatahub-io/opendatahub-operator/apis/config"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/secret"
-	"github.com/opendatahub-io/opendatahub-operator/pkg/utils"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -25,12 +24,12 @@ func (ossm *Ossm) applyManifests() error {
 		if m.patch {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
 				log.Info("patching using manifest", "name", m.name, "path", m.targetPath())
-				return utils.PatchResourceFromFile(config, filename, elems...)
+				return ossm.PatchResourceFromFile(filename, elems...)
 			}
 		} else {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
 				log.Info("applying manifest", "name", m.name, "path", m.targetPath())
-				return utils.CreateResourceFromFile(config, filename, elems...)
+				return ossm.CreateResourceFromFile(filename, elems...)
 			}
 		}
 
@@ -178,7 +177,7 @@ func (ossm *Ossm) prepareTemplateData() (interface{}, error) {
 	}
 
 	if spec.Mesh.Certificate.Generate {
-		if err := createSelfSignedCerts(ossm.config, data.Domain, metav1.ObjectMeta{
+		if err := ossm.createSelfSignedCerts(data.Domain, metav1.ObjectMeta{
 			Name:      spec.Mesh.Certificate.Name,
 			Namespace: spec.Mesh.Namespace,
 		}); err != nil {
@@ -186,7 +185,7 @@ func (ossm *Ossm) prepareTemplateData() (interface{}, error) {
 		}
 	}
 
-	if err := createEnvoySecret(ossm.config, data.OAuth, metav1.ObjectMeta{
+	if err := ossm.createEnvoySecret(data.OAuth, metav1.ObjectMeta{
 		Name:      data.AppNamespace + "-oauth2-tokens",
 		Namespace: data.Mesh.Namespace,
 	}); err != nil {

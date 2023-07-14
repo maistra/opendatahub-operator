@@ -6,13 +6,18 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	kfapisv3 "github.com/opendatahub-io/opendatahub-operator/apis"
 	kftypesv3 "github.com/opendatahub-io/opendatahub-operator/apis/apps"
+	"github.com/opendatahub-io/opendatahub-operator/apis/ossm.plugins.kubeflow.org/v1alpha1"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"regexp"
@@ -26,11 +31,15 @@ const (
 
 var log = ctrlLog.Log.WithName(PluginName)
 
+type cleanup func() error
+
 type Ossm struct {
 	*kfconfig.KfConfig
-	pluginSpec *ossmplugin.OssmPluginSpec
-	config     *rest.Config
-	manifests  []manifest
+	pluginSpec   *ossmplugin.OssmPluginSpec
+	config       *rest.Config
+	manifests    []manifest
+	tracker      *v1alpha1.OssmResourceTracker
+	cleanupFuncs []cleanup
 }
 
 func NewOssm(kfConfig *kfconfig.KfConfig, restConfig *rest.Config) *Ossm {
@@ -77,6 +86,10 @@ func (ossm *Ossm) Init(_ kftypesv3.ResourceEnum) error {
 
 	// TODO ensure operators are installed
 
+	if err := ossm.createResourceTracker(); err != nil {
+		return internalError(err)
+	}
+
 	if err := ossm.createConfigMap("service-mesh-refs",
 		map[string]string{
 			"CONTROL_PLANE_NAME": pluginSpec.Mesh.Name,
@@ -99,6 +112,83 @@ func (ossm *Ossm) Init(_ kftypesv3.ResourceEnum) error {
 	if err := ossm.processManifests(); err != nil {
 		return internalError(err)
 	}
+
+	ossm.cleanupFuncs = append(ossm.cleanupFuncs, func() error {
+		c, err := dynamic.NewForConfig(ossm.config)
+		if err != nil {
+			return err
+		}
+
+		oauthClientName := fmt.Sprintf("%s-oauth2-client", ossm.KfConfig.Namespace)
+		gvr := schema.GroupVersionResource{
+			Group:    "oauth.openshift.io",
+			Version:  "v1",
+			Resource: "oauthclients",
+		}
+
+		err = c.Resource(gvr).Delete(context.Background(), oauthClientName, metav1.DeleteOptions{})
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+
+		log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
+		return err
+	})
+
+	return nil
+}
+
+func (ossm *Ossm) createResourceTracker() error {
+	tracker := &v1alpha1.OssmResourceTracker{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "ossm.plugins.kubeflow.org/v1alpha1",
+			Kind:       "OssmResourceTracker",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ossm.KfConfig.Name + "." + ossm.KfConfig.Namespace,
+		},
+	}
+
+	c, err := dynamic.NewForConfig(ossm.config)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "ossm.plugins.kubeflow.org",
+		Version:  "v1alpha1",
+		Resource: "ossmresourcetrackers",
+	}
+
+	foundTracker, err := c.Resource(gvr).Get(context.Background(), tracker.Name, metav1.GetOptions{})
+	if k8serrors.IsNotFound(err) {
+		unstructuredTracker, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tracker)
+		if err != nil {
+			return err
+		}
+
+		u := unstructured.Unstructured{Object: unstructuredTracker}
+
+		foundTracker, err = c.Resource(gvr).Create(context.Background(), &u, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
+	ossm.tracker = &v1alpha1.OssmResourceTracker{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(foundTracker.Object, ossm.tracker); err != nil {
+		return err
+	}
+
+	ossm.cleanupFuncs = append(ossm.cleanupFuncs, func() error {
+		err := c.Resource(gvr).Delete(context.Background(), ossm.tracker.Name, metav1.DeleteOptions{})
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	})
 
 	return nil
 }
@@ -134,6 +224,14 @@ func (ossm *Ossm) createConfigMap(cfgMapName string, data map[string]string) err
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfgMapName,
 			Namespace: ossm.KfConfig.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: ossm.tracker.APIVersion,
+					Kind:       ossm.tracker.Kind,
+					Name:       ossm.tracker.Name,
+					UID:        ossm.tracker.UID,
+				},
+			},
 		},
 		Data: data,
 	}
@@ -195,7 +293,14 @@ func (ossm *Ossm) MigrateDSProjects() error {
 	return result.ErrorOrNil()
 }
 
-// TODO handle delete
+func (ossm *Ossm) CleanupOwnedResources() error {
+	var cleanupErrors *multierror.Error
+	for _, cleanupFunc := range ossm.cleanupFuncs {
+		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc())
+	}
+
+	return cleanupErrors.ErrorOrNil()
+}
 
 func internalError(err error) error {
 	return &kfapisv3.KfError{

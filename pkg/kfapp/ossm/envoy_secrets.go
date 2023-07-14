@@ -9,7 +9,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"text/template"
 )
 
@@ -31,7 +30,7 @@ resources:
       inline_bytes: "{{ .Secret }}"
 `
 
-func createEnvoySecret(config *rest.Config, oAuth oAuth, objectMeta metav1.ObjectMeta) error {
+func (ossm *Ossm) createEnvoySecret(oAuth oAuth, objectMeta metav1.ObjectMeta) error {
 
 	clientSecret, err := processInlineTemplate(tokenSecret, struct{ Secret string }{Secret: oAuth.ClientSecret})
 	if err != nil {
@@ -43,6 +42,15 @@ func createEnvoySecret(config *rest.Config, oAuth oAuth, objectMeta metav1.Objec
 		return errors.WithStack(err)
 	}
 
+	objectMeta.SetOwnerReferences([]metav1.OwnerReference{
+		{
+			APIVersion: ossm.tracker.APIVersion,
+			Kind:       ossm.tracker.Kind,
+			Name:       ossm.tracker.Name,
+			UID:        ossm.tracker.UID,
+		},
+	})
+
 	secret := &corev1.Secret{
 		ObjectMeta: objectMeta,
 		Data: map[string][]byte{
@@ -51,7 +59,7 @@ func createEnvoySecret(config *rest.Config, oAuth oAuth, objectMeta metav1.Objec
 		},
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(ossm.config)
 	if err != nil {
 		return errors.WithStack(err)
 	}

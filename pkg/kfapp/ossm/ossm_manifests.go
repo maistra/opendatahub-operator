@@ -1,19 +1,22 @@
 package ossm
 
 import (
+	"embed"
 	"fmt"
-	kftypesv3 "github.com/opendatahub-io/opendatahub-operator/apis/apps"
 	configtypes "github.com/opendatahub-io/opendatahub-operator/apis/config"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/secret"
 	"github.com/pkg/errors"
+	"io/fs"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 )
+
+//go:embed templates
+var embeddedFiles embed.FS
 
 type applier func(config *rest.Config, filename string, elems ...configtypes.NameValue) error
 
@@ -23,22 +26,30 @@ func (o *OssmInstaller) applyManifests() error {
 	for _, m := range o.manifests {
 		if m.patch {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
-				log.Info("patching using manifest", "name", m.name, "path", m.targetPath())
+				// TODO: previously was calling targetPath()
+				log.Info("patching using manifest", "name", m.name, "path", m.path)
 				return o.PatchResourceFromFile(filename, elems...)
 			}
 		} else {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
-				log.Info("applying manifest", "name", m.name, "path", m.targetPath())
+				// TODO: previously was calling targetPath()
+				log.Info("applying manifest", "name", m.name, "path", m.path)
 				return o.CreateResourceFromFile(filename, elems...)
 			}
 		}
-
-		err := apply(
-			o.config,
-			m.targetPath(),
-		)
+		targetPath, err := m.targetPath()
 		if err != nil {
-			log.Error(err, "failed to create resource", "name", m.name, "path", m.targetPath())
+			log.Error(err, "Error generating target path")
+		}
+
+		err = apply(
+			o.config,
+			targetPath,
+		)
+
+		if err != nil {
+			// TODO: previously was calling targetPath()
+			log.Error(err, "failed to create resource", "name", m.name, "path", m.path)
 			return err
 		}
 	}
@@ -54,17 +65,17 @@ func (o *OssmInstaller) processManifests() error {
 	// TODO warn when file is not present instead of throwing an error
 	// IMPORTANT: Order of locations from where we load manifests/templates to process is significant
 	err := o.loadManifestsFrom(
-		path.Join("control-plane", "base"),
-		path.Join("control-plane", "filters"),
-		path.Join("control-plane", "oauth"),
-		path.Join("control-plane", "smm.tmpl"),
-		path.Join("control-plane", "namespace.patch.tmpl"),
+		path.Join("templates", "control-plane", "base"),
+		path.Join("templates", "control-plane", "filters"),
+		path.Join("templates", "control-plane", "oauth"),
+		path.Join("templates", "control-plane", "smm.tmpl"),
+		path.Join("templates", "control-plane", "namespace.patch.tmpl"),
 
-		path.Join("authorino", "namespace.tmpl"),
-		path.Join("authorino", "smm.tmpl"),
-		path.Join("authorino", "base"),
-		path.Join("authorino", "rbac"),
-		path.Join("authorino", "mesh-authz-ext-provider.patch.tmpl"),
+		path.Join("templates", "authorino", "namespace.tmpl"),
+		path.Join("templates", "authorino", "smm.tmpl"),
+		path.Join("templates", "authorino", "base"),
+		path.Join("templates", "authorino", "rbac"),
+		path.Join("templates", "authorino", "mesh-authz-ext-provider.patch.tmpl"),
 	)
 	if err != nil {
 		return internalError(errors.WithStack(err))
@@ -76,7 +87,7 @@ func (o *OssmInstaller) processManifests() error {
 	}
 
 	for i, m := range o.manifests {
-		if err := m.processTemplate(data); err != nil {
+		if err := m.processTemplate(embeddedFiles, data); err != nil {
 			return internalError(errors.WithStack(err))
 		}
 
@@ -87,15 +98,11 @@ func (o *OssmInstaller) processManifests() error {
 }
 
 func (o *OssmInstaller) loadManifestsFrom(paths ...string) error {
-	manifestRepo, ok := o.GetRepoCache(kftypesv3.ManifestsRepoName)
-	if !ok {
-		return internalError(errors.New("manifests repo is not defined."))
-	}
-
 	var err error
 	var manifests []manifest
-	for i := range paths {
-		manifests, err = loadManifestsFrom(manifests, path.Join(manifestRepo.LocalPath, TMPL_LOCAL_PATH, paths[i]))
+	var manifestRepo = embeddedFiles
+	for _, p := range paths {
+		manifests, err = loadManifestsFrom(manifestRepo, manifests, p)
 		if err != nil {
 			return internalError(errors.WithStack(err))
 		}
@@ -106,25 +113,57 @@ func (o *OssmInstaller) loadManifestsFrom(paths ...string) error {
 	return nil
 }
 
-func loadManifestsFrom(manifests []manifest, dir string) ([]manifest, error) {
+func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([]manifest, error) {
+	f, err := manifestRepo.Open(path)
+	if err != nil {
+		return nil, internalError(errors.WithStack(err))
+	}
+	defer f.Close()
 
-	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	info, err := f.Stat()
+	if err != nil {
+		return nil, internalError(errors.WithStack(err))
+	}
+
+	if info.IsDir() {
+		// It's a directory, so walk it
+		dirFS, err := fs.Sub(manifestRepo, path)
 		if err != nil {
-			return err
+			return nil, internalError(errors.WithStack(err))
 		}
-		if info.IsDir() {
+
+		err = fs.WalkDir(dirFS, ".", func(relativePath string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			fullPath := filepath.Join(path, relativePath)
+			basePath := filepath.Base(relativePath)
+			fmt.Printf("Adding manifest: name=%s, path=%s\n, dir=%s\n", basePath, fullPath, path)
+			manifests = append(manifests, manifest{
+				name:     basePath,
+				path:     fullPath,
+				patch:    strings.Contains(basePath, ".patch"),
+				template: filepath.Ext(relativePath) == ".tmpl",
+			})
 			return nil
+		})
+		if err != nil {
+			return nil, internalError(errors.WithStack(err))
 		}
+	} else {
+		// It's a file, so handle it directly
+		dir := filepath.Dir(path)
 		basePath := filepath.Base(path)
+		fmt.Printf("Adding manifest: name=%s, path=%s\n, dir=%s\n", basePath, path, dir)
 		manifests = append(manifests, manifest{
 			name:     basePath,
 			path:     path,
 			patch:    strings.Contains(basePath, ".patch"),
 			template: filepath.Ext(path) == ".tmpl",
 		})
-		return nil
-	}); err != nil {
-		return nil, internalError(errors.WithStack(err))
 	}
 
 	return manifests, nil

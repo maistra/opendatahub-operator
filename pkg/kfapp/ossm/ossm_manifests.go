@@ -24,22 +24,20 @@ func (o *OssmInstaller) applyManifests() error {
 	var apply applier
 
 	for _, m := range o.manifests {
+		targetPath, err := m.targetPath()
+		if err != nil {
+			log.Error(err, "Error generating target path")
+		}
 		if m.patch {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
-				// TODO: previously was calling targetPath()
-				log.Info("patching using manifest", "name", m.name, "path", m.path)
+				log.Info("patching using manifest", "name", m.name, "path", targetPath)
 				return o.PatchResourceFromFile(filename, elems...)
 			}
 		} else {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
-				// TODO: previously was calling targetPath()
-				log.Info("applying manifest", "name", m.name, "path", m.path)
+				log.Info("applying manifest", "name", m.name, "path", targetPath)
 				return o.CreateResourceFromFile(filename, elems...)
 			}
-		}
-		targetPath, err := m.targetPath()
-		if err != nil {
-			log.Error(err, "Error generating target path")
 		}
 
 		err = apply(
@@ -48,8 +46,7 @@ func (o *OssmInstaller) applyManifests() error {
 		)
 
 		if err != nil {
-			// TODO: previously was calling targetPath()
-			log.Error(err, "failed to create resource", "name", m.name, "path", m.path)
+			log.Error(err, "failed to create resource", "name", m.name, "path", targetPath)
 			return err
 		}
 	}
@@ -65,10 +62,10 @@ func (o *OssmInstaller) processManifests() error {
 	// TODO warn when file is not present instead of throwing an error
 	// IMPORTANT: Order of locations from where we load manifests/templates to process is significant
 	err := o.loadManifestsFrom(
+		path.Join("templates", "control-plane", "smm.tmpl"),
 		path.Join("templates", "control-plane", "base"),
 		path.Join("templates", "control-plane", "filters"),
 		path.Join("templates", "control-plane", "oauth"),
-		path.Join("templates", "control-plane", "smm.tmpl"),
 		path.Join("templates", "control-plane", "namespace.patch.tmpl"),
 
 		path.Join("templates", "authorino", "namespace.tmpl"),
@@ -141,7 +138,7 @@ func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([
 			}
 			fullPath := filepath.Join(path, relativePath)
 			basePath := filepath.Base(relativePath)
-			fmt.Printf("Adding manifest: name=%s, path=%s\n, dir=%s\n", basePath, fullPath, path)
+			fmt.Printf("Adding manifest: name=%s, path=%s\n, dir=%s\n", basePath, fullPath)
 			manifests = append(manifests, manifest{
 				name:     basePath,
 				path:     fullPath,
@@ -155,9 +152,8 @@ func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([
 		}
 	} else {
 		// It's a file, so handle it directly
-		dir := filepath.Dir(path)
 		basePath := filepath.Base(path)
-		fmt.Printf("Adding manifest: name=%s, path=%s\n, dir=%s\n", basePath, path, dir)
+		fmt.Printf("Adding manifest: name=%s, path=%s\n", basePath, path)
 		manifests = append(manifests, manifest{
 			name:     basePath,
 			path:     path,

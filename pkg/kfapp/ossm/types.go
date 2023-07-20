@@ -1,7 +1,6 @@
 package ossm
 
 import (
-	"fmt"
 	"html/template"
 	"io/fs"
 	"os"
@@ -60,7 +59,7 @@ func (m *manifest) processTemplate(manifestRepo fs.FS, data interface{}) error {
 	}
 	f, err := os.Create(path)
 	if err != nil {
-		log.Error(err, "Failed to create file, 59")
+		log.Error(err, "Failed to create file")
 		return err
 	}
 
@@ -68,11 +67,9 @@ func (m *manifest) processTemplate(manifestRepo fs.FS, data interface{}) error {
 		Funcs(template.FuncMap{"ReplaceChar": ReplaceChar})
 
 	// Read file from the embedded filesystem
-	fmt.Printf("Reading file: %s\n", m.name)
-	fmt.Printf("found: %s\n", m.path)
 	fileData, err := fs.ReadFile(manifestRepo, m.path)
 	if err != nil {
-		log.Error(err, "Failed to read fileData, 70")
+		log.Error(err, "Failed to read fileData")
 		return err
 	}
 

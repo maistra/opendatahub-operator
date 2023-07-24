@@ -138,7 +138,6 @@ func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([
 			}
 			fullPath := filepath.Join(path, relativePath)
 			basePath := filepath.Base(relativePath)
-			fmt.Printf("Adding manifest: name=%s, path=%s\n", basePath, fullPath)
 			manifests = append(manifests, manifest{
 				name:     basePath,
 				path:     fullPath,
@@ -153,7 +152,6 @@ func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([
 	} else {
 		// It's a file, so handle it directly
 		basePath := filepath.Base(path)
-		fmt.Printf("Adding manifest: name=%s, path=%s\n", basePath, path)
 		manifests = append(manifests, manifest{
 			name:     basePath,
 			path:     path,

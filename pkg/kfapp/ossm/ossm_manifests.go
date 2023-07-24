@@ -62,14 +62,14 @@ func (o *OssmInstaller) processManifests() error {
 	// TODO warn when file is not present instead of throwing an error
 	// IMPORTANT: Order of locations from where we load manifests/templates to process is significant
 	err := o.loadManifestsFrom(
-		path.Join("templates", "control-plane", "smm.tmpl"),
 		path.Join("templates", "control-plane", "base"),
 		path.Join("templates", "control-plane", "filters"),
 		path.Join("templates", "control-plane", "oauth"),
+		path.Join("templates", "control-plane", "smm.tmpl"),
 		path.Join("templates", "control-plane", "namespace.patch.tmpl"),
 
 		path.Join("templates", "authorino", "namespace.tmpl"),
-		path.Join("templates", "authorino", "smm.tmpl"),
+		path.Join("templates", "authorino", "auth-smm.tmpl"),
 		path.Join("templates", "authorino", "base"),
 		path.Join("templates", "authorino", "rbac"),
 		path.Join("templates", "authorino", "mesh-authz-ext-provider.patch.tmpl"),
@@ -138,7 +138,7 @@ func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([
 			}
 			fullPath := filepath.Join(path, relativePath)
 			basePath := filepath.Base(relativePath)
-			fmt.Printf("Adding manifest: name=%s, path=%s\n, dir=%s\n", basePath, fullPath)
+			fmt.Printf("Adding manifest: name=%s, path=%s\n", basePath, fullPath)
 			manifests = append(manifests, manifest{
 				name:     basePath,
 				path:     fullPath,

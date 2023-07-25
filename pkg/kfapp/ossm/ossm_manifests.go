@@ -24,7 +24,7 @@ func (o *OssmInstaller) applyManifests() error {
 	var apply applier
 
 	for _, m := range o.manifests {
-		targetPath, err := m.targetPath()
+		targetPath, err := m.targetPath(o.Name, o.Namespace)
 		if err != nil {
 			log.Error(err, "Error generating target path")
 		}
@@ -84,7 +84,7 @@ func (o *OssmInstaller) processManifests() error {
 	}
 
 	for i, m := range o.manifests {
-		if err := m.processTemplate(embeddedFiles, data); err != nil {
+		if err := m.processTemplate(embeddedFiles, data, o.Name, o.Namespace); err != nil {
 			return internalError(errors.WithStack(err))
 		}
 

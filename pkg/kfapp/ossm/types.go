@@ -26,7 +26,7 @@ type manifest struct {
 
 // In order to process the templates, we need to create a tmp directory
 // to store the files. This is because embedded files are read only.
-var outputDir = "/tmp/templates/"
+var outputDir = "/tmp/ossm-installer/"
 
 func ensureDirExists(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -38,21 +38,23 @@ func ensureDirExists(dir string) error {
 	return nil
 }
 
-func (m *manifest) targetPath() (string, error) {
-	if err := ensureDirExists(outputDir); err != nil {
+func (m *manifest) targetPath(kfdefName string, kfdefNs string) (string, error) {
+	fullDir := filepath.Join(outputDir, kfdefNs, kfdefName, filepath.Dir(m.path))
+	if err := ensureDirExists(fullDir); err != nil {
 		return "", err
 	}
+
 	fileName := filepath.Base(m.path)
 	fileNameWithoutExt := fileName[:len(fileName)-len(filepath.Ext(fileName))]
-	return filepath.Join(outputDir, fileNameWithoutExt+".yaml"), nil
+	return filepath.Join(fullDir, fileNameWithoutExt+".yaml"), nil
 }
 
-func (m *manifest) processTemplate(manifestRepo fs.FS, data interface{}) error {
+func (m *manifest) processTemplate(manifestRepo fs.FS, data interface{}, kfdefName string, kfdefNs string) error {
 	if !m.template {
 		return nil
 	}
 	// Create file in the regular filesystem, not the embedded one
-	path, err := m.targetPath()
+	path, err := m.targetPath(kfdefName, kfdefNs)
 	if err != nil {
 		log.Error(err, "Failed to generate target path")
 		return err

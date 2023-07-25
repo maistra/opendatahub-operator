@@ -32,8 +32,8 @@ var _ = When("Migrating Data Science Projects", func() {
 
 	It("should find one namespace to migrate", func() {
 		// given
-		dataScienceNs := createDSProject("dsp-01")
-		regularNs := createNs("non-dsp")
+		dataScienceNs := createDataScienceProject("dsp-01")
+		regularNs := createNamespace("non-dsp")
 		Expect(cli.Create(context.Background(), dataScienceNs)).To(Succeed())
 		Expect(cli.Create(context.Background(), regularNs)).To(Succeed())
 		defer objectCleaner.DeleteAll(dataScienceNs, regularNs)
@@ -59,15 +59,15 @@ var _ = When("Migrating Data Science Projects", func() {
 
 })
 
-func createDSProject(name string) *v1.Namespace {
-	namespace := createNs(name)
+func createDataScienceProject(name string) *v1.Namespace {
+	namespace := createNamespace(name)
 	namespace.Labels = map[string]string{
 		"opendatahub.io/dashboard": "true",
 	}
 	return namespace
 }
 
-func createNs(name string) *v1.Namespace {
+func createNamespace(name string) *v1.Namespace {
 	return &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

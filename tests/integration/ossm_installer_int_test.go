@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	timeout  = 1 * time.Minute
+	timeout  = 5 * time.Second
 	interval = 250 * time.Millisecond
 )
 
@@ -30,7 +30,7 @@ var _ = When("Migrating Data Science Projects", func() {
 		objectCleaner = testenv.CreateCleaner(cli, envTest.Config, timeout, interval)
 	})
 
-	It("should find one namespace to migrate", func() {
+	It("should migrate single namespace", func() {
 		// given
 		dataScienceNs := createDataScienceProject("dsp-01")
 		regularNs := createNamespace("non-dsp")
@@ -42,19 +42,47 @@ var _ = When("Migrating Data Science Projects", func() {
 		Expect(ossmInstaller.MigrateDSProjects()).ToNot(HaveOccurred())
 
 		// then
-		Eventually(func() []v1.Namespace {
-			namespaces := &v1.NamespaceList{}
-			var ns []v1.Namespace
-			if err := cli.List(context.Background(), namespaces); err != nil && !errors.IsNotFound(err) {
-				Fail(err.Error())
-			}
-			for _, namespace := range namespaces.Items {
-				if _, ok := namespace.ObjectMeta.Annotations["opendatahub.io/service-mesh"]; ok {
-					ns = append(ns, namespace)
-				}
-			}
-			return ns
-		}, timeout, interval).Should(HaveLen(1))
+		Eventually(findMigratedNamespaces, timeout, interval).Should(
+			And(
+				HaveLen(1),
+				ContainElement("dsp-01")),
+		)
+	})
+
+	It("should not migrate any non-datascience namespace", func() {
+		// given
+		regularNs := createNamespace("non-dsp")
+		Expect(cli.Create(context.Background(), regularNs)).To(Succeed())
+		defer objectCleaner.DeleteAll(regularNs)
+
+		// when
+		Expect(ossmInstaller.MigrateDSProjects()).ToNot(HaveOccurred())
+
+		// then
+		Consistently(findMigratedNamespaces, timeout, interval).Should(BeEmpty()) // we can't wait forever, but this should be good enough
+	})
+
+	It("should migrate multiple namespaces", func() {
+		// given
+		dataScienceNs01 := createDataScienceProject("dsp-01")
+		dataScienceNs02 := createDataScienceProject("dsp-02")
+		dataScienceNs03 := createDataScienceProject("dsp-03")
+		regularNs := createNamespace("non-dsp")
+		Expect(cli.Create(context.Background(), dataScienceNs01)).To(Succeed())
+		Expect(cli.Create(context.Background(), dataScienceNs02)).To(Succeed())
+		Expect(cli.Create(context.Background(), dataScienceNs03)).To(Succeed())
+		Expect(cli.Create(context.Background(), regularNs)).To(Succeed())
+		defer objectCleaner.DeleteAll(dataScienceNs01, dataScienceNs02, dataScienceNs03, regularNs)
+
+		// when
+		Expect(ossmInstaller.MigrateDSProjects()).ToNot(HaveOccurred())
+
+		// then
+		Eventually(findMigratedNamespaces, timeout, interval).Should(
+			And(
+				HaveLen(3),
+				ContainElements("dsp-01", "dsp-02", "dsp-03")),
+		)
 	})
 
 })
@@ -73,4 +101,18 @@ func createNamespace(name string) *v1.Namespace {
 			Name: name,
 		},
 	}
+}
+
+func findMigratedNamespaces() []string {
+	namespaces := &v1.NamespaceList{}
+	var ns []string
+	if err := cli.List(context.Background(), namespaces); err != nil && !errors.IsNotFound(err) {
+		Fail(err.Error())
+	}
+	for _, namespace := range namespaces.Items {
+		if _, ok := namespace.ObjectMeta.Annotations["opendatahub.io/service-mesh"]; ok {
+			ns = append(ns, namespace.Name)
+		}
+	}
+	return ns
 }

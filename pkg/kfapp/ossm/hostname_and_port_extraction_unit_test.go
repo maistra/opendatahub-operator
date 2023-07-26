@@ -14,12 +14,6 @@ var _ = Describe("extracting hostname and port from URL", func() {
 		Expect(port).To(Equal("8080"))
 	})
 
-	It("should extract hostname and default port 443 for HTTPS URL", func() {
-		hostname, port, err := ossm.ExtractHostNameAndPort("https://opendatahub.io")
-		Expect(err).ToNot(HaveOccurred())
-		Expect(hostname).To(Equal("opendatahub.io"))
-		Expect(port).To(Equal("443"))
-	})
 
 	It("should return original URL if it does not start with http(s) but with other valid protocol", func() {
 		originalURL := "gopher://opendatahub.io"

@@ -59,9 +59,10 @@ func (o *OssmInstaller) processManifests() error {
 	if err := o.SyncCache(); err != nil {
 		return internalError(err)
 	}
-	ControlPlaneDir := "templates/control-plane"
-	AuthDir := "templates/authorino"
-
+	const (
+		ControlPlaneDir = "templates/control-plane"
+		AuthDir         = "templates/authorino"
+	)
 	// TODO warn when file is not present instead of throwing an error
 	// IMPORTANT: Order of locations from where we load manifests/templates to process is significant
 	err := o.loadManifestsFrom(

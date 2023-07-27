@@ -27,6 +27,7 @@ func (o *OssmInstaller) applyManifests() error {
 		targetPath, err := m.targetPath(o.Name, o.Namespace)
 		if err != nil {
 			log.Error(err, "Error generating target path")
+			return err
 		}
 		if m.patch {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
@@ -58,21 +59,23 @@ func (o *OssmInstaller) processManifests() error {
 	if err := o.SyncCache(); err != nil {
 		return internalError(err)
 	}
+	ControlPlaneDir := "templates/control-plane"
+	AuthDir := "templates/authorino"
 
 	// TODO warn when file is not present instead of throwing an error
 	// IMPORTANT: Order of locations from where we load manifests/templates to process is significant
 	err := o.loadManifestsFrom(
-		path.Join("templates", "control-plane", "base"),
-		path.Join("templates", "control-plane", "filters"),
-		path.Join("templates", "control-plane", "oauth"),
-		path.Join("templates", "control-plane", "smm.tmpl"),
-		path.Join("templates", "control-plane", "namespace.patch.tmpl"),
+		path.Join(ControlPlaneDir, "base"),
+		path.Join(ControlPlaneDir, "filters"),
+		path.Join(ControlPlaneDir, "oauth"),
+		path.Join(ControlPlaneDir, "smm.tmpl"),
+		path.Join(ControlPlaneDir, "namespace.patch.tmpl"),
 
-		path.Join("templates", "authorino", "namespace.tmpl"),
-		path.Join("templates", "authorino", "auth-smm.tmpl"),
-		path.Join("templates", "authorino", "base"),
-		path.Join("templates", "authorino", "rbac"),
-		path.Join("templates", "authorino", "mesh-authz-ext-provider.patch.tmpl"),
+		path.Join(AuthDir, "namespace.tmpl"),
+		path.Join(AuthDir, "auth-smm.tmpl"),
+		path.Join(AuthDir, "base"),
+		path.Join(AuthDir, "rbac"),
+		path.Join(AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
 	)
 	if err != nil {
 		return internalError(errors.WithStack(err))

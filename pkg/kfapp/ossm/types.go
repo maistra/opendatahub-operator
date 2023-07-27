@@ -49,11 +49,11 @@ func (m *manifest) targetPath(kfdefName string, kfdefNs string) (string, error) 
 	return filepath.Join(fullDir, fileNameWithoutExt+".yaml"), nil
 }
 
-func (m *manifest) processTemplate(manifestRepo fs.FS, data interface{}, kfdefName string, kfdefNs string) error {
+func (m *manifest) processTemplate(data interface{}, kfdefName string, kfdefNs string) error {
 	if !m.template {
 		return nil
 	}
-	// Create file in the regular filesystem, not the embedded one
+	// Create yaml file in the regular filesystem
 	path, err := m.targetPath(kfdefName, kfdefNs)
 	if err != nil {
 		log.Error(err, "Failed to generate target path")
@@ -68,15 +68,8 @@ func (m *manifest) processTemplate(manifestRepo fs.FS, data interface{}, kfdefNa
 	tmpl := template.New(m.name).
 		Funcs(template.FuncMap{"ReplaceChar": ReplaceChar})
 
-	// Read file from the embedded filesystem
-	fileData, err := fs.ReadFile(manifestRepo, m.path)
-	if err != nil {
-		log.Error(err, "Failed to read fileData")
-		return err
-	}
-
-	// Parse template from a string, not from a file
-	tmpl, err = tmpl.Parse(string(fileData))
+	// Parse template from .tmpl file
+	tmpl, err = tmpl.ParseFiles(strings.Replace(path, ".yaml", ".tmpl", 1))
 	if err != nil {
 		return err
 	}
@@ -89,4 +82,29 @@ func (m *manifest) processTemplate(manifestRepo fs.FS, data interface{}, kfdefNa
 
 func ReplaceChar(s string, oldChar, newChar string) string {
 	return strings.ReplaceAll(s, oldChar, newChar)
+}
+
+func copyEmbeddedFS(fsys fs.FS, root, dest string) error {
+	return fs.WalkDir(fsys, root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		destPath := filepath.Join(dest, path)
+		if d.IsDir() {
+			if err := os.MkdirAll(destPath, 0755); err != nil {
+				return err
+			}
+		} else {
+			data, err := fs.ReadFile(fsys, path)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(destPath, data, 0644); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }

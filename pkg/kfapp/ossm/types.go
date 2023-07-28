@@ -22,6 +22,7 @@ type manifest struct {
 	template,
 	patch,
 	processed bool
+	templateDir string
 }
 
 // In order to process the templates, we need to create a tmp directory
@@ -38,8 +39,8 @@ func ensureDirExists(dir string) error {
 	return nil
 }
 
-func (m *manifest) targetPath(kfdefName string, kfdefNs string) (string, error) {
-	fullDir := filepath.Join(baseOutputDir, kfdefNs, kfdefName, filepath.Dir(m.path))
+func (m *manifest) targetPath() (string, error) {
+	fullDir := filepath.Join(m.templateDir, filepath.Dir(m.path))
 	if err := ensureDirExists(fullDir); err != nil {
 		return "", err
 	}
@@ -49,12 +50,12 @@ func (m *manifest) targetPath(kfdefName string, kfdefNs string) (string, error) 
 	return filepath.Join(fullDir, fileNameWithoutExt+".yaml"), nil
 }
 
-func (m *manifest) processTemplate(data interface{}, kfdefName string, kfdefNs string) error {
+func (m *manifest) processTemplate(data interface{}) error {
 	if !m.template {
 		return nil
 	}
 	// Create yaml file in the regular filesystem
-	path, err := m.targetPath(kfdefName, kfdefNs)
+	path, err := m.targetPath()
 	if err != nil {
 		log.Error(err, "Failed to generate target path")
 		return err

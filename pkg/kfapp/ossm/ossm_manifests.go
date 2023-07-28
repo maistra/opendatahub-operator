@@ -24,7 +24,7 @@ func (o *OssmInstaller) applyManifests() error {
 	var apply applier
 
 	for _, m := range o.manifests {
-		targetPath, err := m.targetPath(o.Name, o.Namespace)
+		targetPath, err := m.targetPath()
 		if err != nil {
 			log.Error(err, "Error generating target path")
 			return err
@@ -91,7 +91,7 @@ func (o *OssmInstaller) processManifests() error {
 	}
 
 	for i, m := range o.manifests {
-		if err := m.processTemplate(data, o.Name, o.Namespace); err != nil {
+		if err := m.processTemplate(data); err != nil {
 			return internalError(errors.WithStack(err))
 		}
 
@@ -105,8 +105,9 @@ func (o *OssmInstaller) loadManifestsFrom(paths ...string) error {
 	var err error
 	var manifests []manifest
 	var manifestRepo = embeddedFiles
+	var rootDir = filepath.Join(baseOutputDir, o.Namespace, o.Name)
 	for _, p := range paths {
-		manifests, err = loadManifestsFrom(manifestRepo, manifests, p)
+		manifests, err = loadManifestsFrom(manifestRepo, manifests, p, rootDir)
 		if err != nil {
 			return internalError(errors.WithStack(err))
 		}
@@ -117,7 +118,7 @@ func (o *OssmInstaller) loadManifestsFrom(paths ...string) error {
 	return nil
 }
 
-func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([]manifest, error) {
+func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string, rootDir string) ([]manifest, error) {
 	f, err := manifestRepo.Open(path)
 	if err != nil {
 		return nil, internalError(errors.WithStack(err))
@@ -146,10 +147,11 @@ func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([
 			fullPath := filepath.Join(path, relativePath)
 			basePath := filepath.Base(relativePath)
 			manifests = append(manifests, manifest{
-				name:     basePath,
-				path:     fullPath,
-				patch:    strings.Contains(basePath, ".patch"),
-				template: filepath.Ext(relativePath) == ".tmpl",
+				name:        basePath,
+				path:        fullPath,
+				patch:       strings.Contains(basePath, ".patch"),
+				template:    filepath.Ext(relativePath) == ".tmpl",
+				templateDir: rootDir,
 			})
 			return nil
 		})
@@ -160,10 +162,11 @@ func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string) ([
 		// It's a file, so handle it directly
 		basePath := filepath.Base(path)
 		manifests = append(manifests, manifest{
-			name:     basePath,
-			path:     path,
-			patch:    strings.Contains(basePath, ".patch"),
-			template: filepath.Ext(path) == ".tmpl",
+			name:        basePath,
+			path:        path,
+			patch:       strings.Contains(basePath, ".patch"),
+			template:    filepath.Ext(path) == ".tmpl",
+			templateDir: rootDir,
 		})
 	}
 

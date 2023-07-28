@@ -26,7 +26,7 @@ type manifest struct {
 
 // In order to process the templates, we need to create a tmp directory
 // to store the files. This is because embedded files are read only.
-var outputDir = "/tmp/ossm-installer/"
+const outputDir = "/tmp/ossm-installer/"
 
 func ensureDirExists(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {

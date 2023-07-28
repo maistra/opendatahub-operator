@@ -86,9 +86,8 @@ func (o *OssmInstaller) processManifests() error {
 	if err != nil {
 		return internalError(errors.WithStack(err))
 	}
-	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", filepath.Join(outputDir, o.Namespace, o.Name)); copyFsErr != nil {
+	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", filepath.Join(baseOutputDir, o.Namespace, o.Name)); copyFsErr != nil {
 		return internalError(errors.WithStack(err))
-	}
 	}
 
 	for i, m := range o.manifests {

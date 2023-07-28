@@ -26,7 +26,7 @@ type manifest struct {
 
 // In order to process the templates, we need to create a tmp directory
 // to store the files. This is because embedded files are read only.
-const outputDir = "/tmp/ossm-installer/"
+const baseOutputDir = "/tmp/ossm-installer/"
 
 func ensureDirExists(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -39,7 +39,7 @@ func ensureDirExists(dir string) error {
 }
 
 func (m *manifest) targetPath(kfdefName string, kfdefNs string) (string, error) {
-	fullDir := filepath.Join(outputDir, kfdefNs, kfdefName, filepath.Dir(m.path))
+	fullDir := filepath.Join(baseOutputDir, kfdefNs, kfdefName, filepath.Dir(m.path))
 	if err := ensureDirExists(fullDir); err != nil {
 		return "", err
 	}

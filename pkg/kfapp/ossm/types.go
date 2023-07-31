@@ -1,6 +1,7 @@
 package ossm
 
 import (
+	"fmt"
 	"html/template"
 	"io/fs"
 	"os"
@@ -22,32 +23,18 @@ type manifest struct {
 	template,
 	patch,
 	processed bool
-	templateDir string
 }
 
 // In order to process the templates, we need to create a tmp directory
 // to store the files. This is because embedded files are read only.
-const baseOutputDir = "/tmp/ossm-installer/"
+const (
+	ControlPlaneDir = "templates/control-plane"
+	AuthDir         = "templates/authorino"
+	baseOutputDir   = "/tmp/ossm-installer/"
+)
 
-func ensureDirExists(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0755)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *manifest) targetPath() (string, error) {
-	fullDir := filepath.Join(m.templateDir, filepath.Dir(m.path))
-	if err := ensureDirExists(fullDir); err != nil {
-		return "", err
-	}
-
-	fileName := filepath.Base(m.path)
-	fileNameWithoutExt := fileName[:len(fileName)-len(filepath.Ext(fileName))]
-	return filepath.Join(fullDir, fileNameWithoutExt+".yaml"), nil
+func (m *manifest) targetPath() string {
+	return fmt.Sprintf("%s%s", m.path[:len(m.path)-len(filepath.Ext(m.path))], ".yaml")
 }
 
 func (m *manifest) processTemplate(data interface{}) error {
@@ -55,11 +42,8 @@ func (m *manifest) processTemplate(data interface{}) error {
 		return nil
 	}
 	// Create yaml file in the regular filesystem
-	path, err := m.targetPath()
-	if err != nil {
-		log.Error(err, "Failed to generate target path")
-		return err
-	}
+	path := m.targetPath()
+
 	f, err := os.Create(path)
 	if err != nil {
 		log.Error(err, "Failed to create file")
@@ -70,7 +54,7 @@ func (m *manifest) processTemplate(data interface{}) error {
 		Funcs(template.FuncMap{"ReplaceChar": ReplaceChar})
 
 	// Parse template from .tmpl file
-	tmpl, err = tmpl.ParseFiles(strings.Replace(path, ".yaml", ".tmpl", 1))
+	tmpl, err = tmpl.ParseFiles(m.path)
 	if err != nil {
 		return err
 	}

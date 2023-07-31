@@ -7,9 +7,9 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/secret"
 	"github.com/pkg/errors"
-	"io/fs"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -24,11 +24,7 @@ func (o *OssmInstaller) applyManifests() error {
 	var apply applier
 
 	for _, m := range o.manifests {
-		targetPath, err := m.targetPath()
-		if err != nil {
-			log.Error(err, "Error generating target path")
-			return err
-		}
+		targetPath := m.targetPath()
 		if m.patch {
 			apply = func(config *rest.Config, filename string, elems ...configtypes.NameValue) error {
 				log.Info("patching using manifest", "name", m.name, "path", targetPath)
@@ -41,7 +37,7 @@ func (o *OssmInstaller) applyManifests() error {
 			}
 		}
 
-		err = apply(
+		err := apply(
 			o.config,
 			targetPath,
 		)
@@ -59,24 +55,28 @@ func (o *OssmInstaller) processManifests() error {
 	if err := o.SyncCache(); err != nil {
 		return internalError(err)
 	}
-	const (
-		ControlPlaneDir = "templates/control-plane"
-		AuthDir         = "templates/authorino"
-	)
+
+	// We copy the embedded template files into /tmp/
+	// As embedded files are read-only, and we need write to templates
+	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", filepath.Join(baseOutputDir, o.Namespace, o.Name)); copyFsErr != nil {
+		return internalError(errors.WithStack(copyFsErr))
+	}
+
 	// TODO warn when file is not present instead of throwing an error
 	// IMPORTANT: Order of locations from where we load manifests/templates to process is significant
+	var rootDir = filepath.Join(baseOutputDir, o.Namespace, o.Name)
 	err := o.loadManifestsFrom(
-		path.Join(ControlPlaneDir, "base"),
-		path.Join(ControlPlaneDir, "filters"),
-		path.Join(ControlPlaneDir, "oauth"),
-		path.Join(ControlPlaneDir, "smm.tmpl"),
-		path.Join(ControlPlaneDir, "namespace.patch.tmpl"),
+		path.Join(rootDir, ControlPlaneDir, "base"),
+		path.Join(rootDir, ControlPlaneDir, "filters"),
+		path.Join(rootDir, ControlPlaneDir, "oauth"),
+		path.Join(rootDir, ControlPlaneDir, "smm.tmpl"),
+		path.Join(rootDir, ControlPlaneDir, "namespace.patch.tmpl"),
 
-		path.Join(AuthDir, "namespace.tmpl"),
-		path.Join(AuthDir, "auth-smm.tmpl"),
-		path.Join(AuthDir, "base"),
-		path.Join(AuthDir, "rbac"),
-		path.Join(AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
+		path.Join(rootDir, AuthDir, "namespace.tmpl"),
+		path.Join(rootDir, AuthDir, "auth-smm.tmpl"),
+		path.Join(rootDir, AuthDir, "base"),
+		path.Join(rootDir, AuthDir, "rbac"),
+		path.Join(rootDir, AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
 	)
 	if err != nil {
 		return internalError(errors.WithStack(err))
@@ -84,9 +84,6 @@ func (o *OssmInstaller) processManifests() error {
 
 	data, err := o.prepareTemplateData()
 	if err != nil {
-		return internalError(errors.WithStack(err))
-	}
-	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", filepath.Join(baseOutputDir, o.Namespace, o.Name)); copyFsErr != nil {
 		return internalError(errors.WithStack(err))
 	}
 
@@ -104,10 +101,9 @@ func (o *OssmInstaller) processManifests() error {
 func (o *OssmInstaller) loadManifestsFrom(paths ...string) error {
 	var err error
 	var manifests []manifest
-	var manifestRepo = embeddedFiles
-	var rootDir = filepath.Join(baseOutputDir, o.Namespace, o.Name)
+
 	for _, p := range paths {
-		manifests, err = loadManifestsFrom(manifestRepo, manifests, p, rootDir)
+		manifests, err = loadManifestsFrom(manifests, p)
 		if err != nil {
 			return internalError(errors.WithStack(err))
 		}
@@ -118,56 +114,24 @@ func (o *OssmInstaller) loadManifestsFrom(paths ...string) error {
 	return nil
 }
 
-func loadManifestsFrom(manifestRepo fs.FS, manifests []manifest, path string, rootDir string) ([]manifest, error) {
-	f, err := manifestRepo.Open(path)
-	if err != nil {
-		return nil, internalError(errors.WithStack(err))
-	}
-	defer f.Close()
-
-	info, err := f.Stat()
-	if err != nil {
-		return nil, internalError(errors.WithStack(err))
-	}
-
-	if info.IsDir() {
-		// It's a directory, so walk it
-		dirFS, err := fs.Sub(manifestRepo, path)
+func loadManifestsFrom(manifests []manifest, path string) ([]manifest, error) {
+	if err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil, internalError(errors.WithStack(err))
+			return err
 		}
-
-		err = fs.WalkDir(dirFS, ".", func(relativePath string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				return nil
-			}
-			fullPath := filepath.Join(path, relativePath)
-			basePath := filepath.Base(relativePath)
-			manifests = append(manifests, manifest{
-				name:        basePath,
-				path:        fullPath,
-				patch:       strings.Contains(basePath, ".patch"),
-				template:    filepath.Ext(relativePath) == ".tmpl",
-				templateDir: rootDir,
-			})
+		if info.IsDir() {
 			return nil
-		})
-		if err != nil {
-			return nil, internalError(errors.WithStack(err))
 		}
-	} else {
-		// It's a file, so handle it directly
 		basePath := filepath.Base(path)
 		manifests = append(manifests, manifest{
-			name:        basePath,
-			path:        path,
-			patch:       strings.Contains(basePath, ".patch"),
-			template:    filepath.Ext(path) == ".tmpl",
-			templateDir: rootDir,
+			name:     basePath,
+			path:     path,
+			patch:    strings.Contains(basePath, ".patch"),
+			template: filepath.Ext(path) == ".tmpl",
 		})
+		return nil
+	}); err != nil {
+		return nil, internalError(errors.WithStack(err))
 	}
 
 	return manifests, nil

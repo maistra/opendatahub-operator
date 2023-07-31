@@ -25,8 +25,6 @@ type manifest struct {
 	processed bool
 }
 
-// In order to process the templates, we need to create a tmp directory
-// to store the files. This is because embedded files are read only.
 const (
 	ControlPlaneDir = "templates/control-plane"
 	AuthDir         = "templates/authorino"

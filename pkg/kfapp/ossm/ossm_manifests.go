@@ -56,15 +56,14 @@ func (o *OssmInstaller) processManifests() error {
 		return internalError(err)
 	}
 
+	var rootDir = filepath.Join(baseOutputDir, o.Namespace, o.Name)
 	// We copy the embedded template files into /tmp/
 	// As embedded files are read-only, and we need write to templates
-	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", filepath.Join(baseOutputDir, o.Namespace, o.Name)); copyFsErr != nil {
+	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", rootDir); copyFsErr != nil {
 		return internalError(errors.WithStack(copyFsErr))
 	}
 
-	// TODO warn when file is not present instead of throwing an error
 	// IMPORTANT: Order of locations from where we load manifests/templates to process is significant
-	var rootDir = filepath.Join(baseOutputDir, o.Namespace, o.Name)
 	err := o.loadManifestsFrom(
 		path.Join(rootDir, ControlPlaneDir, "base"),
 		path.Join(rootDir, ControlPlaneDir, "filters"),

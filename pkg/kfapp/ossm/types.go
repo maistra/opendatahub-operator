@@ -41,7 +41,6 @@ func (m *manifest) processTemplate(data interface{}) error {
 	if !m.template {
 		return nil
 	}
-	// Create yaml file in the regular filesystem
 	path := m.targetPath()
 
 	f, err := os.Create(path)

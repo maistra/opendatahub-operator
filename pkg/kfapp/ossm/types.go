@@ -52,7 +52,6 @@ func (m *manifest) processTemplate(data interface{}) error {
 	tmpl := template.New(m.name).
 		Funcs(template.FuncMap{"ReplaceChar": ReplaceChar})
 
-	// Parse template from .tmpl file
 	tmpl, err = tmpl.ParseFiles(m.path)
 	if err != nil {
 		return err

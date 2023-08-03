@@ -79,6 +79,12 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 	}
 
 	// TODO ensure operators are installed
+	operatorNames := []string{"authorino-operator", "istio-operator"}
+	found, err := o.checkOperatorsExist(operatorNames)
+
+	if err != nil || !found {
+		return internalError(fmt.Errorf("one or more operators were not found or an error occurred: %v", err))
+	}
 
 	if err := o.createResourceTracker(); err != nil {
 		return internalError(err)
@@ -231,6 +237,38 @@ func (o *OssmInstaller) MigrateDSProjects() error {
 	}
 
 	return result.ErrorOrNil()
+}
+
+func (o *OssmInstaller) checkOperatorsExist(operatorNames []string) (bool, error) {
+	client, err := clientset.NewForConfig(o.config)
+	deploymentsClient := client.AppsV1().Deployments("") // empty string for namespace lists across all namespaces
+	if err != nil {
+		return false, err
+	}
+
+	// create map for lookup speed
+	operatorNamesMap := make(map[string]bool)
+	for _, name := range operatorNames {
+		operatorNamesMap[name] = false
+	}
+
+	deployments, err := deploymentsClient.List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "Failed to get deployments")
+	}
+	for _, dep := range deployments.Items {
+		if _, found := operatorNamesMap[dep.Name]; found {
+			operatorNamesMap[dep.Name] = true
+		}
+	}
+
+	for _, isFound := range operatorNamesMap {
+		if !isFound {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func internalError(err error) error {

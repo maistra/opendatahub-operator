@@ -78,12 +78,23 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(errors.New(reason))
 	}
 
-	// TODO ensure operators are installed
-	operatorNames := []string{"authorino-operator", "istio-operator"}
-	found, err := o.checkOperatorsExist(operatorNames)
-
-	if err != nil || !found {
-		return internalError(fmt.Errorf("one or more operators were not found or an error occurred: %v", err))
+	// TODO ensure operators are installed, check for smcp
+	if err := o.CheckForCRD("operator.authorino.kuadrant.io", "v1beta1", "authorinos"); err != nil {
+		log.Info("Failed to find the pre-requisite authorinos CRD, please ensure Authorino operator is installed.")
+		return internalError(err)
+	}
+	if err := o.CheckForCRD("maistra.io", "v2", "servicemeshcontrolplanes"); err != nil {
+		log.Info("Failed to find the pre-requisite SMCP CRD, please ensure OSSM operator is installed.")
+		return internalError(err)
+	}
+	status, err := o.checkSMCPStatus(pluginSpec.Mesh.Name, pluginSpec.Mesh.Namespace)
+	if err != nil {
+		log.Info("An error occurred while checking SMCP status - ensure the SMCP referenced exists.")
+		return internalError(err)
+	}
+	if status != "Ready" {
+		log.Info("The referenced SMCP is not ready.")
+		return internalError(errors.New("SMCP status is not ready"))
 	}
 
 	if err := o.createResourceTracker(); err != nil {

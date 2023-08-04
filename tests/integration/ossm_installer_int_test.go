@@ -8,6 +8,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfapp/ossm/test/testenv"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig"
 	v1 "k8s.io/api/core/v1"
+	apixv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
@@ -87,6 +88,73 @@ var _ = When("Migrating Data Science Projects", func() {
 		)
 	})
 
+})
+
+var _ = When("Checking for CRD", func() {
+	var (
+		objectCleaner *testenv.Cleaner
+		ossmInstaller *ossm.OssmInstaller
+	)
+
+	BeforeEach(func() {
+		ossmInstaller = ossm.NewOssmInstaller(&kfconfig.KfConfig{}, envTest.Config)
+		objectCleaner = testenv.CreateCleaner(cli, envTest.Config, timeout, interval)
+	})
+
+	It("should successfully check existing CRD", func() {
+		// given
+		crdGroup := "test-group"
+		crdVersion := "test-version"
+		crdResource := "test-resource"
+
+		// create a fake CRD
+		crd := &apixv1beta1.CustomResourceDefinition{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crdResource + "." + crdGroup,
+			},
+			Spec: apixv1beta1.CustomResourceDefinitionSpec{
+				Group: crdGroup,
+				Versions: []apixv1beta1.CustomResourceDefinitionVersion{
+					{
+						Name:    crdVersion,
+						Storage: true,
+						Served:  true,
+						Schema: &apixv1beta1.CustomResourceValidation{
+							OpenAPIV3Schema: &apixv1beta1.JSONSchemaProps{
+								Type: "object",
+							},
+						},
+					},
+				},
+				Names: apixv1beta1.CustomResourceDefinitionNames{
+					Plural: crdResource,
+					Kind:   "testCRD",
+				},
+				Scope: apixv1beta1.NamespaceScoped,
+			},
+		}
+		Expect(cli.Create(context.Background(), crd)).To(Succeed())
+		defer objectCleaner.DeleteAll(crd)
+
+		// when
+		err := ossmInstaller.CheckForCRD(crdGroup, crdVersion, crdResource)
+
+		// then
+		Expect(err).To(BeNil())
+	})
+
+	It("should fail to check non-existing CRD", func() {
+		// given
+		crdGroup := "non-existing-group"
+		crdVersion := "non-existing-version"
+		crdResource := "non-existing-resource"
+
+		// when
+		err := ossmInstaller.CheckForCRD(crdGroup, crdVersion, crdResource)
+
+		// then
+		Expect(err).To(HaveOccurred())
+	})
 })
 
 func createDataScienceProject(name string) *v1.Namespace {

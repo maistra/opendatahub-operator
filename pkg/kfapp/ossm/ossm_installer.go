@@ -87,7 +87,7 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		log.Info("Failed to find the pre-requisite SMCP CRD, please ensure OSSM operator is installed.")
 		return internalError(err)
 	}
-	status, err := o.checkSMCPStatus(pluginSpec.Mesh.Name, pluginSpec.Mesh.Namespace)
+	status, err := o.CheckSMCPStatus(pluginSpec.Mesh.Name, pluginSpec.Mesh.Namespace)
 	if err != nil {
 		log.Info("An error occurred while checking SMCP status - ensure the SMCP referenced exists.")
 		return internalError(err)

@@ -10,6 +10,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"time"
 )
 
@@ -99,7 +100,7 @@ var _ = When("Checking for CRD", func() {
 	})
 
 	It("should successfully check existing CRD", func() {
-		// given
+		// given example CRD installed into env from /ossm/test/crd/
 		crdGroup := "ossm.plugins.kubeflow.org"
 		crdVersion := "test-version"
 		crdResource := "test-resources"
@@ -123,6 +124,59 @@ var _ = When("Checking for CRD", func() {
 		// then
 		Expect(err).To(HaveOccurred())
 	})
+})
+
+var _ = When("Checking for SMCP", func() {
+
+	var (
+		objectCleaner *testenv.Cleaner
+		ossmInstaller *ossm.OssmInstaller
+		name          = "test-name"
+		namespace     = "test-namespace"
+	)
+
+	BeforeEach(func() {
+		ossmInstaller = ossm.NewOssmInstaller(&kfconfig.KfConfig{}, envTest.Config)
+		objectCleaner = testenv.CreateCleaner(cli, envTest.Config, timeout, interval)
+	})
+
+	It("should return status if SMCP is found and status is available", func() {
+		ns := createNamespace(namespace)
+		Expect(cli.Create(context.Background(), ns)).To(Succeed())
+		smcpObj := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "maistra.io/v1",
+				"kind":       "ServiceMeshControlPlane",
+				"metadata": map[string]interface{}{
+					"name":      name,
+					"namespace": namespace,
+				},
+				"spec": map[string]interface{}{},
+			},
+		}
+		createErr := ossmInstaller.CreateSMCP(namespace, smcpObj)
+		Expect(createErr).To(BeNil())
+		defer objectCleaner.DeleteAll(ns)
+
+		// when
+		status, err := ossmInstaller.CheckSMCPStatus(name, namespace)
+
+		// then
+		Expect(err).To(BeNil())
+		Expect(status).To(Equal("Ready"))
+	})
+
+	It("should return error if failed to find SMCP", func() {
+		// Don't create namespace or SMCP.
+
+		// when
+		status, err := ossmInstaller.CheckSMCPStatus(name, namespace)
+
+		// then
+		Expect(err).To(HaveOccurred())
+		Expect(status).To(BeEmpty())
+	})
+
 })
 
 func createDataScienceProject(name string) *v1.Namespace {

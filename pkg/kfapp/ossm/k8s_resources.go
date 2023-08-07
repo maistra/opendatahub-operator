@@ -185,7 +185,7 @@ func (o *OssmInstaller) CheckForCRD(group string, version string, resource strin
 	return err
 }
 
-func (o *OssmInstaller) checkSMCPStatus(name string, namespace string) (string, error) {
+func (o *OssmInstaller) CheckSMCPStatus(name string, namespace string) (string, error) {
 	dynamicClient, err := dynamic.NewForConfig(o.config)
 	if err != nil {
 		log.Info("Failed to initialize dynamic client")
@@ -204,10 +204,12 @@ func (o *OssmInstaller) checkSMCPStatus(name string, namespace string) (string, 
 		return "", err
 	}
 
+	log.Info("hi", "obj", unstructObj)
+
 	conditions, found, err := unstructured.NestedSlice(unstructObj.Object, "status", "conditions")
 	if err != nil || !found {
 		log.Info("status conditions not found or error in parsing of SMCP")
-		return "", nil
+		return "", err
 	}
 
 	// Getting status of last condition to check if it is "Ready"
@@ -215,4 +217,50 @@ func (o *OssmInstaller) checkSMCPStatus(name string, namespace string) (string, 
 	status := lastCondition["type"].(string)
 
 	return status, err
+}
+
+// CreateSMCP uses dynamic client to create a dummy SMCP for testing
+func (o *OssmInstaller) CreateSMCP(namespace string, smcpObj *unstructured.Unstructured) error {
+	dynamicClient, err := dynamic.NewForConfig(o.config)
+	if err != nil {
+		log.Info("Failed to initialize dynamic client")
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "maistra.io",
+		Version:  "v1",
+		Resource: "servicemeshcontrolplanes",
+	}
+
+	result, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), smcpObj, metav1.CreateOptions{})
+	if err != nil {
+		log.Info("Failed to create SMCP", "err:", err)
+		return err
+	}
+
+	// Since we don't have maistra operator, we simulate the status
+	statusConditions := []interface{}{
+		map[string]interface{}{
+			"type":   "Ready",
+			"status": "True",
+		},
+	}
+
+	status := map[string]interface{}{
+		"conditions": statusConditions,
+	}
+
+	if err := unstructured.SetNestedField(result.Object, status, "status"); err != nil {
+		log.Info("Failed to set status field", "err:", err)
+		return err
+	}
+
+	_, err = dynamicClient.Resource(gvr).Namespace(namespace).UpdateStatus(context.TODO(), result, metav1.UpdateOptions{})
+	if err != nil {
+		log.Info("Failed to update SMCP status", "err:", err)
+		return err
+	}
+
+	return nil
 }

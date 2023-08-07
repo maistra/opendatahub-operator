@@ -78,7 +78,6 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(errors.New(reason))
 	}
 
-	// TODO ensure operators are installed, check for smcp
 	if err := o.CheckForCRD("operator.authorino.kuadrant.io", "v1beta1", "authorinos"); err != nil {
 		log.Info("Failed to find the pre-requisite authorinos CRD, please ensure Authorino operator is installed.")
 		return internalError(err)

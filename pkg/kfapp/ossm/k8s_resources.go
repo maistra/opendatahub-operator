@@ -204,15 +204,11 @@ func (o *OssmInstaller) CheckSMCPStatus(name string, namespace string) (string, 
 		return "", err
 	}
 
-	log.Info("hi", "obj", unstructObj)
-
 	conditions, found, err := unstructured.NestedSlice(unstructObj.Object, "status", "conditions")
 	if err != nil || !found {
 		log.Info("status conditions not found or error in parsing of SMCP")
 		return "", err
 	}
-
-	// Getting status of last condition to check if it is "Ready"
 	lastCondition := conditions[len(conditions)-1].(map[string]interface{})
 	status := lastCondition["type"].(string)
 

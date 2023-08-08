@@ -78,7 +78,7 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(errors.New(reason))
 	}
 
-	if err := o.CheckForCRD("operator.authorino.kuadrant.io", "v1beta1", "authorinos"); err != nil {
+	if err := o.VerifyCRDInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"); err != nil {
 		log.Info("Failed to find the pre-requisite authorinos CRD, please ensure Authorino operator is installed.")
 		return internalError(err)
 	}
@@ -240,7 +240,7 @@ func (o *OssmInstaller) MigrateDataScienceProjects() error {
 }
 
 func (o *OssmInstaller) ensureServiceMeshInstalled(pluginSpec *ossmplugin.OssmPluginSpec) error {
-	if err := o.CheckForCRD("maistra.io", "v2", "servicemeshcontrolplanes"); err != nil {
+	if err := o.VerifyCRDInstalled("maistra.io", "v2", "servicemeshcontrolplanes"); err != nil {
 		log.Info("Failed to find the pre-requisite SMCP CRD, please ensure OSSM operator is installed.")
 		return internalError(err)
 	}

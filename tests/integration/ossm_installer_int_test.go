@@ -109,7 +109,7 @@ var _ = When("Checking for CRD", func() {
 		crdResource := "test-resources"
 
 		// when
-		err := ossmInstaller.CheckForCRD(crdGroup, crdVersion, crdResource)
+		err := ossmInstaller.VerifyCRDInstalled(crdGroup, crdVersion, crdResource)
 
 		// then
 		Expect(err).To(BeNil())
@@ -122,7 +122,7 @@ var _ = When("Checking for CRD", func() {
 		crdResource := "non-existing-resource"
 
 		// when
-		err := ossmInstaller.CheckForCRD(crdGroup, crdVersion, crdResource)
+		err := ossmInstaller.VerifyCRDInstalled(crdGroup, crdVersion, crdResource)
 
 		// then
 		Expect(err).To(HaveOccurred())

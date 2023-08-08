@@ -112,7 +112,7 @@ var _ = When("Checking for CRD", func() {
 		err := ossmInstaller.VerifyCRDInstalled(crdGroup, crdVersion, crdResource)
 
 		// then
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should fail to check non-existing CRD", func() {

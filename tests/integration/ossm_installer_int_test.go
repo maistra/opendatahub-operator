@@ -158,7 +158,7 @@ var _ = When("Ensuring environment is set up correctly", func() {
 				"spec": map[string]interface{}{},
 			},
 		}
-		createErr := CreateSMCP(namespace, smcpObj, ossmInstaller.GetClientConfig())
+		createErr := CreateSMCP(namespace, smcpObj, envTest.Config)
 		Expect(createErr).To(BeNil())
 		defer objectCleaner.DeleteAll(ns)
 

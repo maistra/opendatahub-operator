@@ -256,10 +256,6 @@ func (o *OssmInstaller) ensureServiceMeshInstalled(pluginSpec *ossmplugin.OssmPl
 	return nil
 }
 
-func (o *OssmInstaller) GetClientConfig() *rest.Config {
-	return o.config
-}
-
 func internalError(err error) error {
 	return &kfapisv3.KfError{
 		Code:    int(kfapisv3.INTERNAL_ERROR),

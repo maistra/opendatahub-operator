@@ -185,7 +185,7 @@ func (o *OssmInstaller) VerifyCRDInstalled(group string, version string, resourc
 	return err
 }
 
-func (o *OssmInstaller) CheckSMCPStatus(name string, namespace string) (string, error) {
+func (o *OssmInstaller) CheckSMCPStatus(name, namespace string) (string, error) {
 	dynamicClient, err := dynamic.NewForConfig(o.config)
 	if err != nil {
 		log.Info("Failed to initialize dynamic client")

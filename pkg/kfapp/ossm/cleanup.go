@@ -5,20 +5,26 @@ import (
 	"fmt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opendatahub-io/opendatahub-operator/apis/ossm.plugins.kubeflow.org/v1alpha1"
+	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
-type cleanup func() error
+type cleanup func(config *rest.Config, appNamespace string, spec *ossmplugin.OssmPluginSpec) error
 
 func (o *OssmInstaller) CleanupOwnedResources() error {
+	spec, err := o.GetPluginSpec()
+	if err != nil {
+		return err
+	}
 	var cleanupErrors *multierror.Error
 	for _, cleanupFunc := range o.cleanupFuncs {
-		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc())
+		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc(o.config, o.KfConfig.Namespace, spec))
 	}
 
 	return cleanupErrors.ErrorOrNil()
@@ -75,7 +81,7 @@ func (o *OssmInstaller) createResourceTracker() error {
 		return err
 	}
 
-	o.onCleanup(func() error {
+	o.onCleanup(func(config *rest.Config, appNamespace string, spec *ossmplugin.OssmPluginSpec) error {
 		err := c.Resource(gvr).Delete(context.Background(), o.tracker.Name, metav1.DeleteOptions{})
 		if k8serrors.IsNotFound(err) {
 			return nil
@@ -86,17 +92,13 @@ func (o *OssmInstaller) createResourceTracker() error {
 	return nil
 }
 
-func (o *OssmInstaller) ingressVolumesRemoval() cleanup {
+func ingressVolumesRemoval() cleanup {
 
-	return func() error {
-		spec, err := o.GetPluginSpec()
-		if err != nil {
-			return err
-		}
+	return func(config *rest.Config, appNamespace string, spec *ossmplugin.OssmPluginSpec) error {
 
-		tokenVolume := fmt.Sprintf("%s-oauth2-tokens", o.KfConfig.Namespace)
+		tokenVolume := fmt.Sprintf("%s-oauth2-tokens", appNamespace)
 
-		dynamicClient, err := dynamic.NewForConfig(o.config)
+		dynamicClient, err := dynamic.NewForConfig(config)
 		if err != nil {
 			return err
 		}
@@ -156,15 +158,15 @@ func (o *OssmInstaller) ingressVolumesRemoval() cleanup {
 
 }
 
-func (o *OssmInstaller) oauthClientRemoval() func() error {
+func oauthClientRemoval() cleanup {
 
-	return func() error {
-		c, err := dynamic.NewForConfig(o.config)
+	return func(config *rest.Config, appNamespace string, spec *ossmplugin.OssmPluginSpec) error {
+		c, err := dynamic.NewForConfig(config)
 		if err != nil {
 			return err
 		}
 
-		oauthClientName := fmt.Sprintf("%s-oauth2-client", o.KfConfig.Namespace)
+		oauthClientName := fmt.Sprintf("%s-oauth2-client", appNamespace)
 		gvr := schema.GroupVersionResource{
 			Group:    "oauth.openshift.io",
 			Version:  "v1",
@@ -188,17 +190,12 @@ func (o *OssmInstaller) oauthClientRemoval() func() error {
 	}
 }
 
-func (o *OssmInstaller) externalAuthzProviderRemoval() cleanup {
+func externalAuthzProviderRemoval() cleanup {
 
-	return func() error {
-		spec, err := o.GetPluginSpec()
-		if err != nil {
-			return err
-		}
+	return func(config *rest.Config, appNamespace string, spec *ossmplugin.OssmPluginSpec) error {
+		ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", appNamespace)
 
-		ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", o.KfConfig.Namespace)
-
-		dynamicClient, err := dynamic.NewForConfig(o.config)
+		dynamicClient, err := dynamic.NewForConfig(config)
 		if err != nil {
 			return err
 		}

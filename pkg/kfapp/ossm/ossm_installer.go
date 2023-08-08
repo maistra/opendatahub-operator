@@ -31,8 +31,8 @@ type OssmInstaller struct {
 	*kfconfig.KfConfig
 	pluginSpec   *ossmplugin.OssmPluginSpec
 	config       *rest.Config
-	manifests    []manifest
 	tracker      *v1alpha1.OssmResourceTracker
+	manifests    []manifest
 	cleanupFuncs []cleanup
 }
 
@@ -125,9 +125,9 @@ func (o *OssmInstaller) Generate(resources kftypesv3.ResourceEnum) error {
 	o.PatchODHDashboardConfig(o.Namespace)
 
 	o.onCleanup(
-		o.oauthClientRemoval(),
-		o.ingressVolumesRemoval(),
-		o.externalAuthzProviderRemoval(),
+		oauthClientRemoval(),
+		ingressVolumesRemoval(),
+		externalAuthzProviderRemoval(),
 	)
 
 	return nil

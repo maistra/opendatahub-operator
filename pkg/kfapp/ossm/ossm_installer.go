@@ -244,13 +244,16 @@ func (o *OssmInstaller) ensureServiceMeshInstalled(pluginSpec *ossmplugin.OssmPl
 		log.Info("Failed to find the pre-requisite SMCP CRD, please ensure OSSM operator is installed.")
 		return internalError(err)
 	}
-	status, err := o.CheckSMCPStatus(pluginSpec.Mesh.Name, pluginSpec.Mesh.Namespace)
+	smcp := pluginSpec.Mesh.Name
+	smcpNs := pluginSpec.Mesh.Namespace
+
+	status, err := o.CheckSMCPStatus(smcp, smcpNs)
 	if err != nil {
 		log.Info("An error occurred while checking SMCP status - ensure the SMCP referenced exists.")
 		return internalError(err)
 	}
 	if status != "Ready" {
-		log.Info("The referenced SMCP is not ready.")
+		log.Info("The referenced SMCP is not ready.", "SMCP name", smcp, "SMCP NS", smcpNs)
 		return internalError(errors.New("SMCP status is not ready"))
 	}
 	return nil

@@ -173,6 +173,7 @@ func (o *OssmInstaller) VerifyCRDInstalled(group string, version string, resourc
 	dynamicClient, err := dynamic.NewForConfig(o.config)
 	if err != nil {
 		log.Error(err, "Failed to initialize dynamic client")
+		return err
 	}
 
 	crdGVR := schema.GroupVersionResource{

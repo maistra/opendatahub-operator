@@ -249,36 +249,8 @@ func (o *OssmInstaller) MigrateDataScienceProjects() error {
 	return result.ErrorOrNil()
 }
 
-func (o *OssmInstaller) checkOperatorsExist(operatorNames []string) (bool, error) {
-	client, err := clientset.NewForConfig(o.config)
-	deploymentsClient := client.AppsV1().Deployments("") // empty string for namespace lists across all namespaces
-	if err != nil {
-		return false, err
-	}
-
-	// create map for lookup speed
-	operatorNamesMap := make(map[string]bool)
-	for _, name := range operatorNames {
-		operatorNamesMap[name] = false
-	}
-
-	deployments, err := deploymentsClient.List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return false, errors.Wrap(err, "Failed to get deployments")
-	}
-	for _, dep := range deployments.Items {
-		if _, found := operatorNamesMap[dep.Name]; found {
-			operatorNamesMap[dep.Name] = true
-		}
-	}
-
-	for _, isFound := range operatorNamesMap {
-		if !isFound {
-			return false, nil
-		}
-	}
-
-	return true, nil
+func (o *OssmInstaller) GetClientConfig() *rest.Config {
+	return o.config
 }
 
 func internalError(err error) error {

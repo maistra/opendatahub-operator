@@ -11,6 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"time"
 )
 
@@ -154,7 +157,7 @@ var _ = When("Checking for SMCP", func() {
 				"spec": map[string]interface{}{},
 			},
 		}
-		createErr := ossmInstaller.CreateSMCP(namespace, smcpObj)
+		createErr := CreateSMCP(namespace, smcpObj, ossmInstaller.GetClientConfig())
 		Expect(createErr).To(BeNil())
 		defer objectCleaner.DeleteAll(ns)
 
@@ -207,4 +210,46 @@ func findMigratedNamespaces() []string {
 		}
 	}
 	return ns
+}
+
+// CreateSMCP uses dynamic client to create a dummy SMCP for testing
+func CreateSMCP(namespace string, smcpObj *unstructured.Unstructured, cfg *rest.Config) error {
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "maistra.io",
+		Version:  "v1",
+		Resource: "servicemeshcontrolplanes",
+	}
+
+	result, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), smcpObj, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Since we don't have maistra operator, we simulate the status
+	statusConditions := []interface{}{
+		map[string]interface{}{
+			"type":   "Ready",
+			"status": "True",
+		},
+	}
+
+	status := map[string]interface{}{
+		"conditions": statusConditions,
+	}
+
+	if err := unstructured.SetNestedField(result.Object, status, "status"); err != nil {
+		return err
+	}
+
+	_, err = dynamicClient.Resource(gvr).Namespace(namespace).UpdateStatus(context.TODO(), result, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

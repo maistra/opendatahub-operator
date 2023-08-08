@@ -129,7 +129,7 @@ var _ = When("Checking for CRD", func() {
 	})
 })
 
-var _ = When("Checking for SMCP", func() {
+var _ = When("Ensuring environment is set up correctly", func() {
 
 	var (
 		objectCleaner *testenv.Cleaner

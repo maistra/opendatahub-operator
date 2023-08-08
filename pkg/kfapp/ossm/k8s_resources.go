@@ -212,5 +212,5 @@ func (o *OssmInstaller) CheckSMCPStatus(name, namespace string) (string, error) 
 	lastCondition := conditions[len(conditions)-1].(map[string]interface{})
 	status := lastCondition["type"].(string)
 
-	return status, err
+	return status, nil
 }

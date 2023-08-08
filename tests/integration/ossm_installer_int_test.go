@@ -126,6 +126,7 @@ var _ = When("Checking for CRD", func() {
 
 		// then
 		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("server could not find the requested resource"))
 	})
 })
 

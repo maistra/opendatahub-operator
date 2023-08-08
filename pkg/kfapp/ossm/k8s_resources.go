@@ -169,7 +169,7 @@ func (o *OssmInstaller) PatchResourceFromFile(filename string, elems ...configty
 	return nil
 }
 
-func (o *OssmInstaller) CheckForCRD(group string, version string, resource string) error {
+func (o *OssmInstaller) CheckForCRD(group, version, resource string) error {
 	dynamicClient, err := dynamic.NewForConfig(o.config)
 	if err != nil {
 		log.Error(err, "Failed to initialize dynamic client")

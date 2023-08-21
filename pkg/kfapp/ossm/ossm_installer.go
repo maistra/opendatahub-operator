@@ -2,21 +2,23 @@ package ossm
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"github.com/hashicorp/go-multierror"
 	kfapisv3 "github.com/opendatahub-io/opendatahub-operator/apis"
 	kftypesv3 "github.com/opendatahub-io/opendatahub-operator/apis/apps"
-	"github.com/opendatahub-io/opendatahub-operator/apis/ossm.plugins.kubeflow.org/v1alpha1"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"net/url"
+	"path"
+	"path/filepath"
 	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
 	"strconv"
 )
@@ -25,15 +27,18 @@ const (
 	PluginName = "KfOssmPlugin"
 )
 
+// TODO rethink where it should belong
+//
+//go:embed templates
+var embeddedFiles embed.FS
+
 var log = ctrlLog.Log.WithName(PluginName)
 
 type OssmInstaller struct {
 	*kfconfig.KfConfig
-	pluginSpec   *ossmplugin.OssmPluginSpec
-	config       *rest.Config
-	tracker      *v1alpha1.OssmResourceTracker
-	manifests    []manifest
-	cleanupFuncs []cleanup
+	pluginSpec *ossmplugin.OssmPluginSpec
+	config     *rest.Config
+	features   []*Feature
 }
 
 func NewOssmInstaller(kfConfig *kfconfig.KfConfig, restConfig *rest.Config) *OssmInstaller {
@@ -56,9 +61,14 @@ func (o *OssmInstaller) GetPluginSpec() (*ossmplugin.OssmPluginSpec, error) {
 	}
 
 	o.pluginSpec = &ossmplugin.OssmPluginSpec{}
-	err := o.KfConfig.GetPluginSpec(PluginName, o.pluginSpec)
+	if err := o.KfConfig.GetPluginSpec(PluginName, o.pluginSpec); err != nil {
+		return nil, err
+	}
 
-	return o.pluginSpec, err
+	// Populate target Kubeflow namespace to have it in one struct instead
+	o.pluginSpec.AppNamespace = o.KfConfig.Namespace
+
+	return o.pluginSpec, nil
 }
 
 func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
@@ -78,59 +88,309 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(errors.New(reason))
 	}
 
-	if err := o.VerifyCRDInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"); err != nil {
-		log.Info("Failed to find the pre-requisite authorinos CRD, please ensure Authorino operator is installed.")
-		return internalError(err)
-	}
-	if err := o.ensureServiceMeshInstalled(pluginSpec); err != nil {
+	return o.enableFeatures()
+}
+
+func (o *OssmInstaller) enableFeatures() error {
+
+	if err := o.SyncCache(); err != nil {
 		return internalError(err)
 	}
 
-	if err := o.createResourceTracker(); err != nil {
-		return internalError(err)
+	var rootDir = filepath.Join(baseOutputDir, o.Namespace, o.Name)
+	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", rootDir); copyFsErr != nil {
+		return internalError(errors.WithStack(copyFsErr))
 	}
 
-	if err := o.createConfigMap("service-mesh-refs",
-		map[string]string{
-			"CONTROL_PLANE_NAME": pluginSpec.Mesh.Name,
-			"MESH_NAMESPACE":     pluginSpec.Mesh.Namespace,
-		}); err != nil {
-		return internalError(err)
+	if feature, err := EnableFeature("control-plane-oauth").
+		For(o.pluginSpec).
+		WithConfig(o.config).
+		FromPaths(
+			path.Join(rootDir, ControlPlaneDir, "base"),
+			path.Join(rootDir, ControlPlaneDir, "oauth"),
+			path.Join(rootDir, ControlPlaneDir, "filters"),
+		).
+		AdditionalResources(
+			func(feature *Feature) error {
+				if feature.spec.Mesh.Certificate.Generate {
+					meta := metav1.ObjectMeta{
+						Name:      feature.spec.Mesh.Certificate.Name,
+						Namespace: feature.spec.Mesh.Namespace,
+						OwnerReferences: []metav1.OwnerReference{
+							feature.tracker.ToOwnerReference(),
+						},
+					}
+
+					cert, err := generateSelfSignedCertificateAsSecret(feature.data.Domain, meta)
+					if err != nil {
+						return internalError(err)
+					}
+
+					if err != nil {
+						return errors.WithStack(err)
+					}
+
+					_, err = feature.clientset.CoreV1().
+						Secrets(feature.spec.Mesh.Namespace).
+						Create(context.TODO(), cert, metav1.CreateOptions{})
+					if err != nil && !k8serrors.IsAlreadyExists(err) {
+						return errors.WithStack(err)
+					}
+				}
+
+				return nil
+			},
+			func(feature *Feature) error {
+				objectMeta := metav1.ObjectMeta{
+					Name:      feature.spec.AppNamespace + "-oauth2-tokens",
+					Namespace: feature.spec.Mesh.Namespace,
+					OwnerReferences: []metav1.OwnerReference{
+						feature.tracker.ToOwnerReference(),
+					},
+				}
+
+				envoySecret, err := createEnvoySecret(feature.data.OAuth, objectMeta)
+				if err != nil {
+					return internalError(err)
+				}
+
+				_, err = feature.clientset.CoreV1().
+					Secrets(objectMeta.Namespace).
+					Create(context.TODO(), envoySecret, metav1.CreateOptions{})
+				if err != nil && !k8serrors.IsAlreadyExists(err) {
+					return errors.WithStack(err)
+				}
+
+				return nil
+			},
+		).
+		WithData(loadData).
+		Preconditions(
+			checkIfCRDIsInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"),
+			ensureServiceMeshInstalled,
+		).
+		OnDelete(
+			removeOAuthClient,
+			removeTokenVolumes,
+		).Load(); err != nil {
+		return nil
+	} else {
+		o.features = append(o.features, feature)
 	}
 
-	if err := o.createConfigMap("auth-refs",
-		map[string]string{
-			"AUTHORINO_LABEL": pluginSpec.Auth.Authorino.Label,
-		}); err != nil {
-		return internalError(err)
+	if feature, err := EnableFeature("shared-config-maps").
+		For(o.pluginSpec).
+		WithConfig(o.config).
+		AdditionalResources(
+			func(feature *Feature) error {
+				if err := feature.createConfigMap("service-mesh-refs",
+					map[string]string{
+						"CONTROL_PLANE_NAME": feature.spec.Mesh.Name,
+						"MESH_NAMESPACE":     feature.spec.Mesh.Namespace,
+					}); err != nil {
+					return internalError(err)
+				}
+
+				if err := feature.createConfigMap("auth-refs",
+					map[string]string{
+						"AUTHORINO_LABEL": feature.spec.Auth.Authorino.Label,
+					}); err != nil {
+					return internalError(err)
+				}
+
+				return nil
+			},
+		).Load(); err != nil {
+		return err
+	} else {
+		o.features = append(o.features, feature)
 	}
 
-	if err := o.MigrateDataScienceProjects(); err != nil {
-		log.Error(err, "failed migrating Data Science Projects")
+	if feature, err := EnableFeature("enable-service-mesh").
+		For(o.pluginSpec).
+		WithConfig(o.config).
+		FromPaths(
+			path.Join(rootDir, ControlPlaneDir, "smm.tmpl"),
+			path.Join(rootDir, ControlPlaneDir, "namespace.patch.tmpl"),
+		).
+		WithData(loadData).
+		Load(); err != nil {
+		return err
+	} else {
+		o.features = append(o.features, feature)
 	}
 
-	if err := o.processManifests(); err != nil {
-		return internalError(err)
+	if feature, err := EnableFeature("enable-service-mesh-for-dashboard").
+		For(o.pluginSpec).
+		WithConfig(o.config).
+		AdditionalResources(
+			func(feature *Feature) error {
+				gvr := schema.GroupVersionResource{
+					Group:    "opendatahub.io",
+					Version:  "v1alpha",
+					Resource: "odhdashboardconfigs",
+				}
+
+				configs, err := feature.dynamicClient.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					return err
+				}
+
+				if len(configs.Items) == 0 {
+					log.Info("No odhdashboardconfig found in namespace, doing nothing")
+					return nil
+				}
+
+				// Assuming there is only one odhdashboardconfig in the namespace, patching the first one
+				config := configs.Items[0]
+				if config.Object["spec"] == nil {
+					config.Object["spec"] = map[string]interface{}{}
+				}
+				spec := config.Object["spec"].(map[string]interface{})
+				if spec["dashboardConfig"] == nil {
+					spec["dashboardConfig"] = map[string]interface{}{}
+				}
+				dashboardConfig := spec["dashboardConfig"].(map[string]interface{})
+				dashboardConfig["disableServiceMesh"] = false
+
+				_, err = feature.dynamicClient.Resource(gvr).
+					Namespace(feature.spec.AppNamespace).
+					Update(context.Background(), &config, metav1.UpdateOptions{})
+				if err != nil {
+					log.Error(err, "Failed to update odhdashboardconfig")
+					return err
+				}
+
+				log.Info("Successfully patched odhdashboardconfig")
+				return nil
+
+			},
+		).Load(); err != nil {
+		return err
+	} else {
+		o.features = append(o.features, feature)
+	}
+
+	if feature, err := EnableFeature("migrate-data-science-projects").
+		For(o.pluginSpec).
+		WithConfig(o.config).
+		AdditionalResources(
+			func(feature *Feature) error {
+				selector := labels.SelectorFromSet(labels.Set{"opendatahub.io/dashboard": "true"})
+
+				namespaceClient := feature.clientset.
+					CoreV1().
+					Namespaces()
+
+				namespaces, err := namespaceClient.List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+				if err != nil {
+					return fmt.Errorf("failed to get namespaces: %v", err)
+				}
+
+				var result *multierror.Error
+
+				for _, namespace := range namespaces.Items {
+					annotations := namespace.GetAnnotations()
+					if annotations == nil {
+						annotations = map[string]string{}
+					}
+					annotations["opendatahub.io/service-mesh"] = "true"
+					namespace.SetAnnotations(annotations)
+
+					if _, err := namespaceClient.Update(context.TODO(), &namespace, metav1.UpdateOptions{}); err != nil {
+						result = multierror.Append(result, err)
+					}
+				}
+
+				return result.ErrorOrNil()
+			},
+		).Load(); err != nil {
+		return err
+	} else {
+		o.features = append(o.features, feature)
+	}
+
+	if feature, err := EnableFeature("setup-external-authorizaion").
+		For(o.pluginSpec).
+		WithConfig(o.config).
+		FromPaths(
+			path.Join(rootDir, AuthDir, "namespace.tmpl"),
+			path.Join(rootDir, AuthDir, "auth-smm.tmpl"),
+			path.Join(rootDir, AuthDir, "base"),
+			path.Join(rootDir, AuthDir, "rbac"),
+			path.Join(rootDir, AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
+		).
+		WithData(loadData).
+		OnDelete(
+			func(feature *Feature) error {
+				ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.spec.AppNamespace)
+
+				gvr := schema.GroupVersionResource{
+					Group:    "maistra.io",
+					Version:  "v2",
+					Resource: "servicemeshcontrolplanes",
+				}
+
+				mesh := feature.spec.Mesh
+
+				smcp, err := feature.dynamicClient.Resource(gvr).
+					Namespace(mesh.Namespace).
+					Get(context.Background(), mesh.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				extensionProviders, found, err := unstructured.NestedSlice(smcp.Object, "spec", "techPreview", "meshConfig", "extensionProviders")
+				if err != nil {
+					return err
+				}
+				if !found {
+					log.Info("no extension providers found", "smcp", mesh.Name, "istio-ns", mesh.Namespace)
+					return nil
+				}
+
+				for i, v := range extensionProviders {
+					extensionProvider, ok := v.(map[string]interface{})
+					if !ok {
+						fmt.Println("Unexpected type for extensionProvider")
+						continue
+					}
+
+					if extensionProvider["name"] == ossmAuthzProvider {
+						extensionProviders = append(extensionProviders[:i], extensionProviders[i+1:]...)
+						err = unstructured.SetNestedSlice(smcp.Object, extensionProviders, "spec", "techPreview", "meshConfig", "extensionProviders")
+						if err != nil {
+							return err
+						}
+						break
+					}
+				}
+
+				_, err = feature.dynamicClient.Resource(gvr).
+					Namespace(mesh.Namespace).
+					Update(context.Background(), smcp, metav1.UpdateOptions{})
+
+				return err
+
+			},
+		).Load(); err != nil {
+		return err
+	} else {
+		o.features = append(o.features, feature)
 	}
 
 	return nil
 }
 
-func (o *OssmInstaller) Generate(resources kftypesv3.ResourceEnum) error {
-	// TODO sort by Kind as .Apply does
-	if err := o.applyManifests(); err != nil {
-		return internalError(errors.WithStack(err))
+func (o *OssmInstaller) Generate(_ kftypesv3.ResourceEnum) error {
+	var applyErrors *multierror.Error
+
+	for _, feature := range o.features {
+		err := feature.Apply()
+		applyErrors = multierror.Append(applyErrors, err)
 	}
 
-	o.PatchODHDashboardConfig(o.Namespace)
-
-	o.onCleanup(
-		oauthClientRemoval(),
-		ingressVolumesRemoval(),
-		externalAuthzProviderRemoval(),
-	)
-
-	return nil
+	return applyErrors.ErrorOrNil()
 }
 
 // ExtractHostNameAndPort strips given URL in string from http(s):// prefix and subsequent path,
@@ -164,101 +424,6 @@ func ExtractHostNameAndPort(s string) (string, string, error) {
 	}
 
 	return hostname, port, nil
-}
-
-func (o *OssmInstaller) createConfigMap(cfgMapName string, data map[string]string) error {
-
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cfgMapName,
-			Namespace: o.KfConfig.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: o.tracker.APIVersion,
-					Kind:       o.tracker.Kind,
-					Name:       o.tracker.Name,
-					UID:        o.tracker.UID,
-				},
-			},
-		},
-		Data: data,
-	}
-
-	client, err := clientset.NewForConfig(o.config)
-	if err != nil {
-		return err
-	}
-
-	configMaps := client.CoreV1().ConfigMaps(configMap.Namespace)
-	_, err = configMaps.Get(context.TODO(), configMap.Name, metav1.GetOptions{})
-	if k8serrors.IsNotFound(err) {
-		_, err = configMaps.Create(context.TODO(), configMap, metav1.CreateOptions{})
-		if err != nil {
-			return err
-		}
-
-	} else if k8serrors.IsAlreadyExists(err) {
-		_, err = configMaps.Update(context.TODO(), configMap, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-	} else {
-		return err
-	}
-
-	return nil
-}
-
-func (o *OssmInstaller) MigrateDataScienceProjects() error {
-
-	client, err := clientset.NewForConfig(o.config)
-	if err != nil {
-		return err
-	}
-
-	selector := labels.SelectorFromSet(labels.Set{"opendatahub.io/dashboard": "true"})
-
-	namespaces, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return fmt.Errorf("failed to get namespaces: %v", err)
-	}
-
-	var result *multierror.Error
-
-	for _, namespace := range namespaces.Items {
-		annotations := namespace.GetAnnotations()
-		if annotations == nil {
-			annotations = map[string]string{}
-		}
-		annotations["opendatahub.io/service-mesh"] = "true"
-		namespace.SetAnnotations(annotations)
-
-		if _, err := client.CoreV1().Namespaces().Update(context.TODO(), &namespace, metav1.UpdateOptions{}); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	return result.ErrorOrNil()
-}
-
-func (o *OssmInstaller) ensureServiceMeshInstalled(pluginSpec *ossmplugin.OssmPluginSpec) error {
-	if err := o.VerifyCRDInstalled("maistra.io", "v2", "servicemeshcontrolplanes"); err != nil {
-		log.Info("Failed to find the pre-requisite SMCP CRD, please ensure OSSM operator is installed.")
-		return internalError(err)
-	}
-	smcp := pluginSpec.Mesh.Name
-	smcpNs := pluginSpec.Mesh.Namespace
-
-	status, err := o.CheckSMCPStatus(smcp, smcpNs)
-	if err != nil {
-		log.Info("An error occurred while checking SMCP status - ensure the SMCP referenced exists.")
-		return internalError(err)
-	}
-	if status != "Ready" {
-		log.Info("The referenced SMCP is not ready.", "SMCP name", smcp, "SMCP NS", smcpNs)
-		return internalError(errors.New("SMCP status is not ready"))
-	}
-	return nil
 }
 
 func internalError(err error) error {

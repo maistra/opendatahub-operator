@@ -12,19 +12,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 )
 
-func GetDomain(config *rest.Config) (string, error) {
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return "", nil
-	}
-
+func GetDomain(dynamicClient dynamic.Interface) (string, error) {
 	cluster, err := dynamicClient.Resource(
 		schema.GroupVersionResource{
 			Group:    "config.openshift.io",

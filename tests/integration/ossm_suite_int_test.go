@@ -21,10 +21,10 @@ import (
 )
 
 var (
-	cli     client.Client
-	envTest *envtest.Environment
-	ctx     context.Context
-	cancel  context.CancelFunc
+	envTestClient client.Client
+	envTest       *envtest.Environment
+	ctx           context.Context
+	cancel        context.CancelFunc
 )
 
 var testScheme = runtime.NewScheme()
@@ -62,13 +62,13 @@ var _ = BeforeSuite(func() {
 		},
 	}
 
-	cfg, err := envTest.Start()
+	config, err := envTest.Start()
 	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
+	Expect(config).NotTo(BeNil())
 
-	cli, err = client.New(cfg, client.Options{Scheme: testScheme})
+	envTestClient, err = client.New(config, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
-	Expect(cli).NotTo(BeNil())
+	Expect(envTestClient).NotTo(BeNil())
 })
 
 var _ = AfterSuite(func() {

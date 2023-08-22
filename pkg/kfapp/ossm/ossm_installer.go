@@ -23,7 +23,7 @@ var log = ctrlLog.Log.WithName(PluginName)
 
 type OssmInstaller struct {
 	*kfconfig.KfConfig
-	pluginSpec *ossmplugin.OssmPluginSpec
+	PluginSpec *ossmplugin.OssmPluginSpec
 	config     *rest.Config
 	features   []*feature.Feature
 }
@@ -43,19 +43,19 @@ func GetPlatform(kfConfig *kfconfig.KfConfig) (kftypesv3.Platform, error) {
 
 // GetPluginSpec gets the plugin spec.
 func (o *OssmInstaller) GetPluginSpec() (*ossmplugin.OssmPluginSpec, error) {
-	if o.pluginSpec != nil {
-		return o.pluginSpec, nil
+	if o.PluginSpec != nil {
+		return o.PluginSpec, nil
 	}
 
-	o.pluginSpec = &ossmplugin.OssmPluginSpec{}
-	if err := o.KfConfig.GetPluginSpec(PluginName, o.pluginSpec); err != nil {
+	o.PluginSpec = &ossmplugin.OssmPluginSpec{}
+	if err := o.KfConfig.GetPluginSpec(PluginName, o.PluginSpec); err != nil {
 		return nil, err
 	}
 
 	// Populate target Kubeflow namespace to have it in one struct instead
-	o.pluginSpec.AppNamespace = o.KfConfig.Namespace
+	o.PluginSpec.AppNamespace = o.KfConfig.Namespace
 
-	return o.pluginSpec, nil
+	return o.PluginSpec, nil
 }
 
 func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
@@ -90,7 +90,7 @@ func (o *OssmInstaller) enableFeatures() error {
 	}
 
 	if oauth, err := feature.CreateFeature("control-plane-oauth").
-		For(o.pluginSpec).
+		For(o.PluginSpec).
 		WithConfig(o.config).
 		FromPaths(
 			path.Join(rootDir, feature.ControlPlaneDir, "base"),
@@ -116,7 +116,7 @@ func (o *OssmInstaller) enableFeatures() error {
 	}
 
 	if cfMaps, err := feature.CreateFeature("shared-config-maps").
-		For(o.pluginSpec).
+		For(o.PluginSpec).
 		WithConfig(o.config).
 		AdditionalResources(feature.CreateConfigMaps).
 		Load(); err != nil {
@@ -126,7 +126,7 @@ func (o *OssmInstaller) enableFeatures() error {
 	}
 
 	if serviceMesh, err := feature.CreateFeature("enable-service-mesh").
-		For(o.pluginSpec).
+		For(o.PluginSpec).
 		WithConfig(o.config).
 		FromPaths(
 			path.Join(rootDir, feature.ControlPlaneDir, "smm.tmpl"),
@@ -140,7 +140,7 @@ func (o *OssmInstaller) enableFeatures() error {
 	}
 
 	if dashboard, err := feature.CreateFeature("enable-service-mesh-for-dashboard").
-		For(o.pluginSpec).
+		For(o.PluginSpec).
 		WithConfig(o.config).
 		AdditionalResources(feature.EnableServiceMeshInDashboard).
 		Load(); err != nil {
@@ -150,7 +150,7 @@ func (o *OssmInstaller) enableFeatures() error {
 	}
 
 	if dataScienceProjects, err := feature.CreateFeature("migrate-data-science-projects").
-		For(o.pluginSpec).
+		For(o.PluginSpec).
 		WithConfig(o.config).
 		// TODO this is not creating any resource - it is updating it
 		AdditionalResources(feature.MigrateDataScienceProjects).
@@ -161,7 +161,7 @@ func (o *OssmInstaller) enableFeatures() error {
 	}
 
 	if extAuthz, err := feature.CreateFeature("setup-external-authorization").
-		For(o.pluginSpec).
+		For(o.PluginSpec).
 		WithConfig(o.config).
 		FromPaths(
 			path.Join(rootDir, feature.AuthDir, "namespace.tmpl"),
@@ -193,6 +193,8 @@ func (o *OssmInstaller) Generate(_ kftypesv3.ResourceEnum) error {
 }
 
 func (o *OssmInstaller) CleanupResources() error {
+	// FIXME delete owner tracker
+
 	var cleanupErrors *multierror.Error
 	for _, f := range o.features {
 		cleanupErrors = multierror.Append(cleanupErrors, f.Cleanup())

@@ -16,8 +16,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"net/url"
+	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
+	"strings"
 )
 
 var log = ctrlLog.Log.WithName("ossm-features")
@@ -32,7 +35,7 @@ type Feature struct {
 	dynamicClient dynamic.Interface
 
 	client client.Client
-	// TODO Rethink
+
 	manifests      []manifest
 	cleanups       []cleanup
 	resources      []resourceCreator
@@ -98,7 +101,7 @@ func (f *Feature) Apply() error {
 }
 
 func (f *Feature) Cleanup() error {
-
+	// TODO delete tracker instance for each feature
 	var cleanupErrors *multierror.Error
 	for _, cleanupFunc := range f.cleanups {
 		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc(f))
@@ -154,6 +157,43 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 	return nil
 }
 
+func (f *Feature) addCleanup(cleanupFuncs ...cleanup) {
+	f.cleanups = append(f.cleanups, cleanupFuncs...)
+}
+
+type apply func(filename string) error
+
+func (f *Feature) apply(m manifest) error {
+	var applier apply
+	targetPath := m.targetPath()
+
+	if m.patch {
+		applier = func(filename string) error {
+			log.Info("patching using manifest", "name", m.name, "path", targetPath)
+
+			return f.patchResourceFromFile(filename)
+		}
+	} else {
+		applier = func(filename string) error {
+			log.Info("applying manifest", "name", m.name, "path", targetPath)
+
+			return f.createResourceFromFile(filename)
+		}
+	}
+
+	if err := applier(targetPath); err != nil {
+		log.Error(err, "failed to create resource", "name", m.name, "path", targetPath)
+
+		return err
+	}
+
+	return nil
+}
+
+func (f *Feature) OwnerReference() metav1.OwnerReference {
+	return f.tracker.ToOwnerReference()
+}
+
 // createResourceTracker instantiates OssmResourceTracker for given a Feature. All resources created when applying
 // it will have this object attached as OwnerReference. It's a cluster-scoped resource.
 // Once created, there's a cleanup hook added which will be invoked on deletion.
@@ -164,7 +204,7 @@ func (f *Feature) createResourceTracker() error {
 			Kind:       "OssmResourceTracker",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: f.Spec.AppNamespace + "-" + f.Name,
+			Name: f.Spec.AppNamespace + "-" + convertToRFC1123Subdomain(f.Name),
 		},
 	}
 
@@ -208,41 +248,17 @@ func (f *Feature) createResourceTracker() error {
 	return nil
 }
 
-func (f *Feature) addCleanup(cleanupFuncs ...cleanup) {
-	f.cleanups = append(f.cleanups, cleanupFuncs...)
-}
+func convertToRFC1123Subdomain(input string) string {
+	escaped := url.PathEscape(input)
 
-type apply func(filename string) error
+	// Define a regular expression to match characters that need to be replaced
+	regex := regexp.MustCompile(`[^A-Za-z0-9.\-_]+`)
 
-func (f *Feature) apply(m manifest) error {
-	var applier apply
-	targetPath := m.targetPath()
+	// Replace non-alphanumeric characters with a hyphen
+	replaced := regex.ReplaceAllString(escaped, "-")
 
-	if m.patch {
-		applier = func(filename string) error {
-			log.Info("patching using manifest", "name", m.name, "path", targetPath)
-
-			return f.patchResourceFromFile(filename)
-		}
-	} else {
-		applier = func(filename string) error {
-			log.Info("applying manifest", "name", m.name, "path", targetPath)
-
-			return f.createResourceFromFile(filename)
-		}
-	}
-
-	if err := applier(targetPath); err != nil {
-		log.Error(err, "failed to create resource", "name", m.name, "path", targetPath)
-
-		return err
-	}
-
-	return nil
-}
-
-func (f *Feature) OwnerReference() metav1.OwnerReference {
-	return f.tracker.ToOwnerReference()
+	// Convert the result to lowercase
+	return strings.ToLower(replaced)
 }
 
 type ClusterData struct {
@@ -252,6 +268,7 @@ type ClusterData struct {
 	AppNamespace string
 }
 
+// TODO slice it to smaller loaders
 func LoadClusterData(feature *Feature) (*ClusterData, error) {
 	data := &ClusterData{
 		AppNamespace: feature.Spec.AppNamespace,

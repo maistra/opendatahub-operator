@@ -46,7 +46,7 @@ func GenerateEnvoySecrets(feature *Feature) error {
 		Name:      feature.Spec.AppNamespace + "-oauth2-tokens",
 		Namespace: feature.Spec.Mesh.Namespace,
 		OwnerReferences: []metav1.OwnerReference{
-			feature.tracker.ToOwnerReference(),
+			feature.OwnerReference(),
 		},
 	}
 

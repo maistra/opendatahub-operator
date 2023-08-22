@@ -5,8 +5,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfapp/ossm"
-	"github.com/opendatahub-io/opendatahub-operator/pkg/kfapp/ossm/test/testenv"
+	"github.com/opendatahub-io/opendatahub-operator/pkg/kfapp/ossm/feature"
+	"github.com/opendatahub-io/opendatahub-operator/pkg/kfapp/ossm/feature/test/testenv"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig"
+	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,25 +27,46 @@ const (
 var _ = Describe("Migrating", func() {
 
 	var (
-		objectCleaner *testenv.Cleaner
-		ossmInstaller *ossm.OssmInstaller
+		objectCleaner    *testenv.Cleaner
+		ossmInstaller    *ossm.OssmInstaller
+		ossmPluginSpec   *ossmplugin.OssmPluginSpec
+		migrationFeature *feature.Feature
 	)
 
 	BeforeEach(func() {
-		ossmInstaller = ossm.NewOssmInstaller(&kfconfig.KfConfig{}, envTest.Config)
-		objectCleaner = testenv.CreateCleaner(cli, envTest.Config, timeout, interval)
+		objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
+
+		config := kfconfig.KfConfig{}
+		config.SetNamespace("default")
+		config.Spec.Plugins = append(config.Spec.Plugins, kfconfig.Plugin{
+			Name: "KfOssmPlugin",
+			Kind: "KfOssmPlugin",
+		})
+		ossmInstaller = ossm.NewOssmInstaller(&config, envTest.Config)
+
+		var err error
+		ossmPluginSpec, err = ossmInstaller.GetPluginSpec()
+		Expect(err).ToNot(HaveOccurred())
+
+		migrationFeature, err = feature.CreateFeature("datascience-project-migration").
+			For(ossmPluginSpec).
+			WithConfig(envTest.Config).
+			AdditionalResources(feature.MigrateDataScienceProjects).Load()
+
+		Expect(err).ToNot(HaveOccurred())
+
 	})
 
 	It("should migrate single namespace", func() {
 		// given
 		dataScienceNs := createDataScienceProject("dsp-01")
 		regularNs := createNamespace("non-dsp")
-		Expect(cli.Create(context.Background(), dataScienceNs)).To(Succeed())
-		Expect(cli.Create(context.Background(), regularNs)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), dataScienceNs)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), regularNs)).To(Succeed())
 		defer objectCleaner.DeleteAll(dataScienceNs, regularNs)
 
 		// when
-		Expect(ossmInstaller.MigrateDataScienceProjects()).ToNot(HaveOccurred())
+		Expect(migrationFeature.Apply()).ToNot(HaveOccurred())
 
 		// then
 		Eventually(findMigratedNamespaces, timeout, interval).Should(
@@ -57,11 +80,11 @@ var _ = Describe("Migrating", func() {
 	It("should not migrate any non-datascience namespace", func() {
 		// given
 		regularNs := createNamespace("non-dsp")
-		Expect(cli.Create(context.Background(), regularNs)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), regularNs)).To(Succeed())
 		defer objectCleaner.DeleteAll(regularNs)
 
 		// when
-		Expect(ossmInstaller.MigrateDataScienceProjects()).ToNot(HaveOccurred())
+		Expect(migrationFeature.Apply()).ToNot(HaveOccurred())
 
 		// then
 		Consistently(findMigratedNamespaces, timeout, interval).Should(BeEmpty()) // we can't wait forever, but this should be good enough
@@ -73,14 +96,14 @@ var _ = Describe("Migrating", func() {
 		dataScienceNs02 := createDataScienceProject("dsp-02")
 		dataScienceNs03 := createDataScienceProject("dsp-03")
 		regularNs := createNamespace("non-dsp")
-		Expect(cli.Create(context.Background(), dataScienceNs01)).To(Succeed())
-		Expect(cli.Create(context.Background(), dataScienceNs02)).To(Succeed())
-		Expect(cli.Create(context.Background(), dataScienceNs03)).To(Succeed())
-		Expect(cli.Create(context.Background(), regularNs)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), dataScienceNs01)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), dataScienceNs02)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), dataScienceNs03)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), regularNs)).To(Succeed())
 		defer objectCleaner.DeleteAll(dataScienceNs01, dataScienceNs02, dataScienceNs03, regularNs)
 
 		// when
-		Expect(ossmInstaller.MigrateDataScienceProjects()).ToNot(HaveOccurred())
+		Expect(migrationFeature.Apply()).ToNot(HaveOccurred())
 
 		// then
 		Eventually(findMigratedNamespaces, timeout, interval).Should(
@@ -95,11 +118,22 @@ var _ = Describe("Migrating", func() {
 
 var _ = Describe("Checking for CRD", func() {
 	var (
-		ossmInstaller *ossm.OssmInstaller
+		ossmInstaller       *ossm.OssmInstaller
+		ossmPluginSpec      *ossmplugin.OssmPluginSpec
+		verificationFeature *feature.Feature
 	)
 
 	BeforeEach(func() {
-		ossmInstaller = ossm.NewOssmInstaller(&kfconfig.KfConfig{}, envTest.Config)
+		config := kfconfig.KfConfig{}
+		config.SetNamespace("default")
+		config.Spec.Plugins = append(config.Spec.Plugins, kfconfig.Plugin{
+			Name: "KfOssmPlugin",
+			Kind: "KfOssmPlugin",
+		})
+		ossmInstaller = ossm.NewOssmInstaller(&config, envTest.Config)
+		var err error
+		ossmPluginSpec, err = ossmInstaller.GetPluginSpec()
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should successfully check existing CRD", func() {
@@ -108,8 +142,16 @@ var _ = Describe("Checking for CRD", func() {
 		crdVersion := "test-version"
 		crdResource := "test-resources"
 
+		var err error
+		verificationFeature, err = feature.CreateFeature("CRD verification").
+			For(ossmPluginSpec).
+			WithConfig(envTest.Config).
+			Preconditions(feature.EnsureCRDIsInstalled(crdGroup, crdVersion, crdResource)).
+			Load()
+		Expect(err).ToNot(HaveOccurred())
+
 		// when
-		err := ossmInstaller.VerifyCRDInstalled(crdGroup, crdVersion, crdResource)
+		err = verificationFeature.Apply()
 
 		// then
 		Expect(err).ToNot(HaveOccurred())
@@ -121,8 +163,16 @@ var _ = Describe("Checking for CRD", func() {
 		crdVersion := "non-existing-version"
 		crdResource := "non-existing-resource"
 
+		var err error
+		verificationFeature, err = feature.CreateFeature("CRD verification").
+			For(ossmPluginSpec).
+			WithConfig(envTest.Config).
+			Preconditions(feature.EnsureCRDIsInstalled(crdGroup, crdVersion, crdResource)).
+			Load()
+		Expect(err).ToNot(HaveOccurred())
+
 		// when
-		err := ossmInstaller.VerifyCRDInstalled(crdGroup, crdVersion, crdResource)
+		err = verificationFeature.Apply()
 
 		// then
 		Expect(err).To(HaveOccurred())
@@ -133,20 +183,42 @@ var _ = Describe("Checking for CRD", func() {
 var _ = Describe("Ensuring environment is set up correctly", func() {
 
 	var (
-		objectCleaner *testenv.Cleaner
-		ossmInstaller *ossm.OssmInstaller
-		name          = "test-name"
-		namespace     = "test-namespace"
+		objectCleaner    *testenv.Cleaner
+		ossmInstaller    *ossm.OssmInstaller
+		ossmPluginSpec   *ossmplugin.OssmPluginSpec
+		serviceMeshCheck *feature.Feature
+		name             = "test-name"
+		namespace        = "test-namespace"
 	)
 
 	BeforeEach(func() {
-		ossmInstaller = ossm.NewOssmInstaller(&kfconfig.KfConfig{}, envTest.Config)
-		objectCleaner = testenv.CreateCleaner(cli, envTest.Config, timeout, interval)
+		config := kfconfig.KfConfig{}
+		config.SetNamespace(namespace)
+		config.Spec.Plugins = append(config.Spec.Plugins, kfconfig.Plugin{
+			Name: "KfOssmPlugin",
+			Kind: "KfOssmPlugin",
+		})
+		ossmInstaller = ossm.NewOssmInstaller(&config, envTest.Config)
+		var err error
+		ossmPluginSpec, err = ossmInstaller.GetPluginSpec()
+		Expect(err).ToNot(HaveOccurred())
+
+		ossmPluginSpec.Mesh.Name = name
+		ossmPluginSpec.Mesh.Namespace = namespace
+
+		serviceMeshCheck, err = feature.CreateFeature("datascience-project-migration").
+			For(ossmPluginSpec).
+			WithConfig(envTest.Config).
+			Preconditions(feature.EnsureServiceMeshInstalled).Load()
+
+		Expect(err).ToNot(HaveOccurred())
+
+		objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 	})
 
-	It("should return status if SMCP is found and status is available", func() {
+	It("should find installed SMCP", func() {
 		ns := createNamespace(namespace)
-		Expect(cli.Create(context.Background(), ns)).To(Succeed())
+		Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
 		smcpObj := &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"apiVersion": "maistra.io/v1",
@@ -163,22 +235,14 @@ var _ = Describe("Ensuring environment is set up correctly", func() {
 		defer objectCleaner.DeleteAll(ns)
 
 		// when
-		status, err := ossmInstaller.CheckSMCPStatus(name, namespace)
+		err := serviceMeshCheck.Apply()
 
 		// then
-		Expect(err).To(BeNil())
-		Expect(status).To(Equal("Ready"))
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should return error if failed to find SMCP", func() {
-		// Don't create namespace or SMCP.
-
-		// when
-		status, err := ossmInstaller.CheckSMCPStatus(name, namespace)
-
-		// then
-		Expect(err).To(HaveOccurred())
-		Expect(status).To(BeEmpty())
+	It("should fail to find SMCP", func() {
+		Expect(serviceMeshCheck.Apply()).To(HaveOccurred())
 	})
 
 })
@@ -202,7 +266,7 @@ func createNamespace(name string) *v1.Namespace {
 func findMigratedNamespaces() []string {
 	namespaces := &v1.NamespaceList{}
 	var ns []string
-	if err := cli.List(context.Background(), namespaces); err != nil && !errors.IsNotFound(err) {
+	if err := envTestClient.List(context.Background(), namespaces); err != nil && !errors.IsNotFound(err) {
 		Fail(err.Error())
 	}
 	for _, namespace := range namespaces.Items {

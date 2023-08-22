@@ -1,4 +1,4 @@
-package ossm
+package feature
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 const (
 	ControlPlaneDir = "templates/control-plane"
 	AuthDir         = "templates/authorino"
-	baseOutputDir   = "/tmp/ossm-installer/"
+	BaseOutputDir   = "/tmp/ossm-installer/"
 )
 
 type manifest struct {
@@ -41,7 +41,7 @@ func LoadManifestsFrom(path string) ([]manifest, error) {
 		})
 		return nil
 	}); err != nil {
-		return nil, internalError(errors.WithStack(err))
+		return nil, errors.WithStack(err)
 	}
 
 	return manifests, nil

@@ -1,4 +1,4 @@
-package ossm
+package feature
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func checkIfCRDIsInstalled(group string, version string, resource string) precondition {
+func EnsureCRDIsInstalled(group string, version string, resource string) precondition {
 	return func(f *Feature) error {
 		crdGVR := schema.GroupVersionResource{
 			Group:    group,
@@ -23,23 +23,23 @@ func checkIfCRDIsInstalled(group string, version string, resource string) precon
 	}
 }
 
-func ensureServiceMeshInstalled(feature *Feature) error {
-	if err := checkIfCRDIsInstalled("maistra.io", "v2", "servicemeshcontrolplanes")(feature); err != nil {
+func EnsureServiceMeshInstalled(feature *Feature) error {
+	if err := EnsureCRDIsInstalled("maistra.io", "v2", "servicemeshcontrolplanes")(feature); err != nil {
 		log.Info("Failed to find the pre-requisite SMCP CRD, please ensure OSSM operator is installed.")
 		return err
 	}
 
-	smcp := feature.spec.Mesh.Name
-	smcpNs := feature.spec.Mesh.Namespace
+	smcp := feature.Spec.Mesh.Name
+	smcpNs := feature.Spec.Mesh.Namespace
 
 	status, err := checkSMCPStatus(feature.dynamicClient, smcp, smcpNs)
 	if err != nil {
 		log.Info("An error occurred while checking SMCP status - ensure the SMCP referenced exists.")
-		return internalError(err)
+		return err
 	}
 	if status != "Ready" {
 		log.Info("The referenced SMCP is not ready.", "name", smcp, "namespace", smcpNs)
-		return internalError(errors.New("SMCP status is not ready"))
+		return errors.New("SMCP status is not ready")
 	}
 	return nil
 

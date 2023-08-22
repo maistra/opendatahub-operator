@@ -1,4 +1,4 @@
-package ossm
+package feature
 
 import (
 	"context"
@@ -17,27 +17,29 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+var log = ctrlLog.Log.WithName("ossm-features")
+
 type Feature struct {
-	Name string
+	Name        string
+	Spec        *ossmplugin.OssmPluginSpec
+	ClusterData *ClusterData
+	tracker     *v1alpha1.OssmResourceTracker
 
 	clientset     *kubernetes.Clientset
 	dynamicClient dynamic.Interface
-	client        client.Client
 
-	spec    *ossmplugin.OssmPluginSpec
-	tracker *v1alpha1.OssmResourceTracker
-
+	client client.Client
 	// TODO Rethink
 	manifests      []manifest
 	cleanups       []cleanup
 	resources      []resourceCreator
 	preconditions  []precondition
 	postconditions []postcondition
-	loader         dataLoader
 
-	data *data
+	loader dataLoader
 }
 
 // TODO not sure if we need different signatures here
@@ -46,9 +48,9 @@ type resourceCreator func(feature *Feature) error
 type cleanup func(feature *Feature) error
 type precondition func(feature *Feature) error
 
-type dataLoader func(feature *Feature) (*data, error)
+type dataLoader func(feature *Feature) (*ClusterData, error)
 
-func noopDataLoader(feature *Feature) (*data, error) {
+func noopDataLoader(feature *Feature) (*ClusterData, error) {
 	return nil, nil
 }
 
@@ -65,7 +67,7 @@ func (f *Feature) Apply() error {
 
 	// Load necessary data
 	var err error
-	f.data, err = f.loader(f)
+	f.ClusterData, err = f.loader(f)
 	if err != nil {
 		return err
 	}
@@ -79,8 +81,8 @@ func (f *Feature) Apply() error {
 
 	// Process and apply manifests
 	for i, m := range f.manifests {
-		if err := m.processTemplate(f.data); err != nil {
-			return internalError(errors.WithStack(err))
+		if err := m.processTemplate(f.ClusterData); err != nil {
+			return errors.WithStack(err)
 		}
 
 		fmt.Printf("%d: %+v\n", i, m)
@@ -123,7 +125,7 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfgMapName,
-			Namespace: f.spec.AppNamespace,
+			Namespace: f.Spec.AppNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				f.tracker.ToOwnerReference(),
 			},
@@ -162,7 +164,7 @@ func (f *Feature) createResourceTracker() error {
 			Kind:       "OssmResourceTracker",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: f.spec.AppNamespace + "-" + f.Name,
+			Name: f.Spec.AppNamespace + "-" + f.Name,
 		},
 	}
 
@@ -239,41 +241,45 @@ func (f *Feature) apply(m manifest) error {
 	return nil
 }
 
-type data struct {
+func (f *Feature) OwnerReference() metav1.OwnerReference {
+	return f.tracker.ToOwnerReference()
+}
+
+type ClusterData struct {
 	*ossmplugin.OssmPluginSpec
 	OAuth oAuth
 	Domain,
 	AppNamespace string
 }
 
-func loadData(feature *Feature) (*data, error) {
-	data := &data{
-		AppNamespace: feature.spec.AppNamespace,
+func LoadClusterData(feature *Feature) (*ClusterData, error) {
+	data := &ClusterData{
+		AppNamespace: feature.Spec.AppNamespace,
 	}
 
-	data.OssmPluginSpec = feature.spec
+	data.OssmPluginSpec = feature.Spec
 
 	if domain, err := GetDomain(feature.dynamicClient); err == nil {
 		data.Domain = domain
 	} else {
-		return nil, internalError(errors.WithStack(err))
+		return nil, errors.WithStack(err)
 	}
 
 	var err error
 
 	var clientSecret, hmac *secret.Secret
 	if clientSecret, err = secret.NewSecret("ossm-odh-oauth", "random", 32); err != nil {
-		return nil, internalError(errors.WithStack(err))
+		return nil, errors.WithStack(err)
 	}
 
 	if hmac, err = secret.NewSecret("ossm-odh-hmac", "random", 32); err != nil {
-		return nil, internalError(errors.WithStack(err))
+		return nil, errors.WithStack(err)
 	}
 
 	if oauthServerDetailsJson, err := GetOAuthServerDetails(); err == nil {
 		hostName, port, errUrlParsing := ExtractHostNameAndPort(oauthServerDetailsJson.Get("issuer").MustString("issuer"))
 		if errUrlParsing != nil {
-			return nil, internalError(errUrlParsing)
+			return nil, errUrlParsing
 		}
 
 		data.OAuth = oAuth{
@@ -285,7 +291,7 @@ func loadData(feature *Feature) (*data, error) {
 			Hmac:          hmac.Value,
 		}
 	} else {
-		return nil, internalError(errors.WithStack(err))
+		return nil, errors.WithStack(err)
 	}
 
 	return data, nil

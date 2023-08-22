@@ -1,4 +1,4 @@
-package ossm
+package feature
 
 import (
 	"bytes"

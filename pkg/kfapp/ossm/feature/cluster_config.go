@@ -1,4 +1,4 @@
-package ossm
+package feature
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -112,4 +113,37 @@ func getKubeAPIURLWithPath(path string) *url.URL {
 		Host:   getKubernetesServiceHost(),
 		Path:   path,
 	}
+}
+
+// ExtractHostNameAndPort strips given URL in string from http(s):// prefix and subsequent path,
+// returning host name and port if defined (otherwise defaults to 443).
+//
+// This is useful when getting value from http headers (such as origin).
+// If given string does not start with http(s) prefix it will be returned as is.
+func ExtractHostNameAndPort(s string) (string, string, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return "", "", err
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return s, "", nil
+	}
+
+	hostname := u.Hostname()
+
+	port := "443" // default for https
+	if u.Scheme == "http" {
+		port = "80"
+	}
+
+	if u.Port() != "" {
+		port = u.Port()
+		_, err := strconv.Atoi(port)
+		if err != nil {
+			return "", "", errors.New("invalid port number: " + port)
+		}
+	}
+
+	return hostname, port, nil
 }

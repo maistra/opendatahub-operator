@@ -1,4 +1,4 @@
-package ossm
+package feature
 
 import (
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
@@ -16,13 +16,13 @@ type featureBuilder struct {
 	builders []partialBuilder
 }
 
-func EnableFeature(name string) *featureBuilder {
+func CreateFeature(name string) *featureBuilder {
 	return &featureBuilder{name: name}
 }
 
 func (fb *featureBuilder) For(spec *ossmplugin.OssmPluginSpec) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
-		f.spec = spec
+		f.Spec = spec
 
 		return nil
 	})
@@ -62,7 +62,7 @@ func (fb *featureBuilder) FromPaths(paths ...string) *featureBuilder {
 		for _, path := range paths {
 			manifests, err = LoadManifestsFrom(path)
 			if err != nil {
-				return internalError(errors.WithStack(err))
+				return errors.WithStack(err)
 			}
 		}
 

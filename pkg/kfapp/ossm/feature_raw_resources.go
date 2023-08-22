@@ -34,7 +34,6 @@ const (
 	YamlSeparator = "(?m)^---[ \t]*$"
 )
 
-// TODO move - basic functionalities for manifests
 func (f *Feature) createResourceFromFile(filename string, elems ...configtypes.NameValue) error {
 	elemsMap := make(map[string]configtypes.NameValue)
 	for _, nv := range elems {

@@ -60,11 +60,11 @@ func (m *manifest) processTemplate(data interface{}) error {
 	f, err := os.Create(path)
 	if err != nil {
 		log.Error(err, "Failed to create file")
+
 		return err
 	}
 
-	tmpl := template.New(m.name).
-		Funcs(template.FuncMap{"ReplaceChar": ReplaceChar})
+	tmpl := template.New(m.name).Funcs(template.FuncMap{"ReplaceChar": ReplaceChar})
 
 	tmpl, err = tmpl.ParseFiles(m.path)
 	if err != nil {

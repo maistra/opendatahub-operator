@@ -105,35 +105,14 @@ func (f *Feature) Cleanup() error {
 	return cleanupErrors.ErrorOrNil()
 }
 
-// TODO move to manifest itself? should it self-apply?
 func (f *Feature) applyManifests() error {
-
-	var apply func(filename string) error
-
+	var applyErrors *multierror.Error
 	for _, m := range f.manifests {
-		targetPath := m.targetPath()
-		if m.patch {
-			apply = func(filename string) error {
-				log.Info("patching using manifest", "name", m.name, "path", targetPath)
-
-				return f.patchResourceFromFile(filename)
-			}
-		} else {
-			apply = func(filename string) error {
-				log.Info("applying manifest", "name", m.name, "path", targetPath)
-
-				return f.createResourceFromFile(filename)
-			}
-		}
-
-		if err := apply(targetPath); err != nil {
-			log.Error(err, "failed to create resource", "name", m.name, "path", targetPath)
-
-			return err
-		}
+		err := f.apply(m)
+		applyErrors = multierror.Append(applyErrors, err)
 	}
 
-	return nil
+	return applyErrors.ErrorOrNil()
 }
 
 // FIXME not quite sure it belongs to a feature. Should be something "resource creator" facade instead
@@ -229,6 +208,35 @@ func (f *Feature) createResourceTracker() error {
 
 func (f *Feature) addCleanup(cleanupFuncs ...cleanup) {
 	f.cleanups = append(f.cleanups, cleanupFuncs...)
+}
+
+type apply func(filename string) error
+
+func (f *Feature) apply(m manifest) error {
+	var applier apply
+	targetPath := m.targetPath()
+
+	if m.patch {
+		applier = func(filename string) error {
+			log.Info("patching using manifest", "name", m.name, "path", targetPath)
+
+			return f.patchResourceFromFile(filename)
+		}
+	} else {
+		applier = func(filename string) error {
+			log.Info("applying manifest", "name", m.name, "path", targetPath)
+
+			return f.createResourceFromFile(filename)
+		}
+	}
+
+	if err := applier(targetPath); err != nil {
+		log.Error(err, "failed to create resource", "name", m.name, "path", targetPath)
+
+		return err
+	}
+
+	return nil
 }
 
 type data struct {

@@ -120,14 +120,14 @@ func (fb *featureBuilder) Load() (*Feature, error) {
 		loader: noopDataLoader,
 	}
 
-	if err := feature.createResourceTracker(); err != nil {
-		return nil, err
-	}
-
 	for i := range fb.builders {
 		if err := fb.builders[i](feature); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := feature.createResourceTracker(); err != nil {
+		return nil, err
 	}
 
 	return feature, nil

@@ -1,7 +1,6 @@
 package ossm
 
 import (
-	"embed"
 	"fmt"
 	"github.com/hashicorp/go-multierror"
 	kfapisv3 "github.com/opendatahub-io/opendatahub-operator/apis"
@@ -10,9 +9,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/pkg/errors"
-	"io/fs"
 	"k8s.io/client-go/rest"
-	"os"
 	"path"
 	"path/filepath"
 	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -21,11 +18,6 @@ import (
 const (
 	PluginName = "KfOssmPlugin"
 )
-
-// TODO rethink where it should belong
-//
-//go:embed templates
-var embeddedFiles embed.FS
 
 var log = ctrlLog.Log.WithName(PluginName)
 
@@ -93,8 +85,8 @@ func (o *OssmInstaller) enableFeatures() error {
 	}
 
 	var rootDir = filepath.Join(feature.BaseOutputDir, o.Namespace, o.Name)
-	if copyFsErr := copyEmbeddedFS(embeddedFiles, "templates", rootDir); copyFsErr != nil {
-		return internalError(errors.WithStack(copyFsErr))
+	if err := copyEmbeddedFiles("templates", rootDir); err != nil {
+		return internalError(errors.WithStack(err))
 	}
 
 	if oauth, err := feature.CreateFeature("control-plane-oauth").
@@ -202,8 +194,8 @@ func (o *OssmInstaller) Generate(_ kftypesv3.ResourceEnum) error {
 
 func (o *OssmInstaller) CleanupResources() error {
 	var cleanupErrors *multierror.Error
-	for _, feature := range o.features {
-		cleanupErrors = multierror.Append(cleanupErrors, feature.Cleanup())
+	for _, f := range o.features {
+		cleanupErrors = multierror.Append(cleanupErrors, f.Cleanup())
 	}
 
 	return cleanupErrors.ErrorOrNil()
@@ -214,33 +206,4 @@ func internalError(err error) error {
 		Code:    int(kfapisv3.INTERNAL_ERROR),
 		Message: fmt.Sprintf("%+v", err),
 	}
-}
-
-// In order to process the templates, we need to create a tmp directory
-// to store the files. This is because embedded files are read only.
-// copyEmbeddedFS ensures that files embedded using go:embed are populated
-// to dest directory
-func copyEmbeddedFS(fsys fs.FS, root, dest string) error {
-	return fs.WalkDir(fsys, root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		destPath := filepath.Join(dest, path)
-		if d.IsDir() {
-			if err := os.MkdirAll(destPath, 0755); err != nil {
-				return err
-			}
-		} else {
-			data, err := fs.ReadFile(fsys, path)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(destPath, data, 0644); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
 }

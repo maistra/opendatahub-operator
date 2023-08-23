@@ -2,7 +2,6 @@ package feature
 
 import (
 	"context"
-	"fmt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opendatahub-io/opendatahub-operator/apis/ossm.plugins.kubeflow.org/v1alpha1"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
@@ -83,12 +82,12 @@ func (f *Feature) Apply() error {
 	}
 
 	// Process and apply manifests
-	for i, m := range f.manifests {
+	for _, m := range f.manifests {
 		if err := m.processTemplate(f.ClusterData); err != nil {
 			return errors.WithStack(err)
 		}
 
-		fmt.Printf("%d: %+v\n", i, m)
+		log.Info("applying manifest", "path", m.targetPath())
 	}
 
 	if err := f.applyManifests(); err != nil {
@@ -101,7 +100,6 @@ func (f *Feature) Apply() error {
 }
 
 func (f *Feature) Cleanup() error {
-	// TODO delete tracker instance for each feature
 	var cleanupErrors *multierror.Error
 	for _, cleanupFunc := range f.cleanups {
 		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc(f))

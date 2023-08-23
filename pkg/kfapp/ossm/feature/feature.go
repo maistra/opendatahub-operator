@@ -25,7 +25,6 @@ var log = ctrlLog.Log.WithName("ossm-features")
 
 type Feature struct {
 	Name        string
-	Spec        *ossmplugin.OssmPluginSpec
 	ClusterData *ClusterData // TODO rename
 	tracker     *v1alpha1.OssmResourceTracker
 

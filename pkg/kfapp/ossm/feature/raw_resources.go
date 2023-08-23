@@ -66,7 +66,7 @@ func (f *Feature) createResourceFromFile(filename string, elems ...configtypes.N
 		}
 
 		u.SetOwnerReferences([]metav1.OwnerReference{
-			f.tracker.ToOwnerReference(),
+			f.OwnerReference(),
 		})
 
 		logrus.Infof("Creating %s", name)

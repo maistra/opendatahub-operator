@@ -22,7 +22,7 @@ func CreateFeature(name string) *featureBuilder {
 
 func (fb *featureBuilder) For(spec *ossmplugin.OssmPluginSpec) *featureBuilder {
 	createSpec := func(f *Feature) error {
-		f.ClusterData = &ClusterData{
+		f.Spec = &Spec{
 			OssmPluginSpec: spec,
 		}
 

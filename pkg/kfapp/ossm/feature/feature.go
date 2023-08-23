@@ -24,9 +24,8 @@ import (
 var log = ctrlLog.Log.WithName("ossm-features")
 
 type Feature struct {
-	Name        string
-	ClusterData *ClusterData // TODO rename
-	tracker     *v1alpha1.OssmResourceTracker
+	Name string
+	Spec *Spec
 
 	clientset     *kubernetes.Clientset
 	dynamicClient dynamic.Interface
@@ -73,7 +72,7 @@ func (f *Feature) Apply() error {
 
 	// Process and apply manifests
 	for _, m := range f.manifests {
-		if err := m.processTemplate(f.ClusterData); err != nil {
+		if err := m.processTemplate(f.Spec); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -116,9 +115,9 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfgMapName,
-			Namespace: f.ClusterData.AppNamespace,
+			Namespace: f.Spec.AppNamespace,
 			OwnerReferences: []metav1.OwnerReference{
-				f.tracker.ToOwnerReference(),
+				f.Spec.Tracker.ToOwnerReference(),
 			},
 		},
 		Data: data,
@@ -179,7 +178,7 @@ func (f *Feature) apply(m manifest) error {
 }
 
 func (f *Feature) OwnerReference() metav1.OwnerReference {
-	return f.tracker.ToOwnerReference()
+	return f.Spec.Tracker.ToOwnerReference()
 }
 
 // createResourceTracker instantiates OssmResourceTracker for given a Feature. All resources created when applying
@@ -192,7 +191,7 @@ func (f *Feature) createResourceTracker() error {
 			Kind:       "OssmResourceTracker",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: f.ClusterData.AppNamespace + "-" + convertToRFC1123Subdomain(f.Name),
+			Name: f.Spec.AppNamespace + "-" + convertToRFC1123Subdomain(f.Name),
 		},
 	}
 
@@ -219,14 +218,14 @@ func (f *Feature) createResourceTracker() error {
 		return err
 	}
 
-	f.tracker = &v1alpha1.OssmResourceTracker{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(foundTracker.Object, f.tracker); err != nil {
+	f.Spec.Tracker = &v1alpha1.OssmResourceTracker{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(foundTracker.Object, f.Spec.Tracker); err != nil {
 		return err
 	}
 
 	// Register its own cleanup
 	f.addCleanup(func(feature *Feature) error {
-		if err := f.dynamicClient.Resource(gvr).Delete(context.Background(), f.tracker.Name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+		if err := f.dynamicClient.Resource(gvr).Delete(context.Background(), f.Spec.Tracker.Name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
 			return err
 		}
 
@@ -249,9 +248,10 @@ func convertToRFC1123Subdomain(input string) string {
 	return strings.ToLower(replaced)
 }
 
-type ClusterData struct {
+type Spec struct {
 	*ossmplugin.OssmPluginSpec
 	OAuth oAuth
 	Domain,
 	AppNamespace string
+	Tracker *v1alpha1.OssmResourceTracker
 }

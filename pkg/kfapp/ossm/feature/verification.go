@@ -29,8 +29,8 @@ func EnsureServiceMeshInstalled(feature *Feature) error {
 		return err
 	}
 
-	smcp := feature.ClusterData.Mesh.Name
-	smcpNs := feature.ClusterData.Mesh.Namespace
+	smcp := feature.Spec.Mesh.Name
+	smcpNs := feature.Spec.Mesh.Namespace
 
 	status, err := checkSMCPStatus(feature.dynamicClient, smcp, smcpNs)
 	if err != nil {

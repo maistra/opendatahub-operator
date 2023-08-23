@@ -7,7 +7,7 @@ import (
 
 // TODO slice it to smaller loaders
 func LoadClusterData(feature *Feature) error {
-	data := feature.ClusterData
+	data := feature.Spec
 
 	if domain, err := GetDomain(feature.dynamicClient); err == nil {
 		data.Domain = domain

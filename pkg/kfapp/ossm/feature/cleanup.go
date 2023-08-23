@@ -10,7 +10,7 @@ import (
 )
 
 func RemoveTokenVolumes(feature *Feature) error {
-	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.ClusterData.AppNamespace)
+	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.Spec.AppNamespace)
 
 	gvr := schema.GroupVersionResource{
 		Group:    "maistra.io",
@@ -18,8 +18,8 @@ func RemoveTokenVolumes(feature *Feature) error {
 		Resource: "servicemeshcontrolplanes",
 	}
 
-	meshNs := feature.ClusterData.Mesh.Namespace
-	meshName := feature.ClusterData.Mesh.Name
+	meshNs := feature.Spec.Mesh.Namespace
+	meshName := feature.Spec.Mesh.Name
 
 	smcp, err := feature.dynamicClient.Resource(gvr).Namespace(meshNs).Get(context.Background(), meshName, metav1.GetOptions{})
 	if err != nil {
@@ -69,7 +69,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 }
 
 func RemoveOAuthClient(feature *Feature) error {
-	oauthClientName := fmt.Sprintf("%s-oauth2-client", feature.ClusterData.AppNamespace)
+	oauthClientName := fmt.Sprintf("%s-oauth2-client", feature.Spec.AppNamespace)
 	gvr := schema.GroupVersionResource{
 		Group:    "oauth.openshift.io",
 		Version:  "v1",
@@ -93,7 +93,7 @@ func RemoveOAuthClient(feature *Feature) error {
 }
 
 func RemoveExtensionProvider(feature *Feature) error {
-	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.ClusterData.AppNamespace)
+	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.Spec.AppNamespace)
 
 	gvr := schema.GroupVersionResource{
 		Group:    "maistra.io",
@@ -101,7 +101,7 @@ func RemoveExtensionProvider(feature *Feature) error {
 		Resource: "servicemeshcontrolplanes",
 	}
 
-	mesh := feature.ClusterData.Mesh
+	mesh := feature.Spec.Mesh
 
 	smcp, err := feature.dynamicClient.Resource(gvr).
 		Namespace(mesh.Namespace).

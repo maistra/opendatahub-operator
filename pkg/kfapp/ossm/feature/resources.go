@@ -12,10 +12,10 @@ import (
 )
 
 func GenerateSelfSignedCertificate(feature *Feature) error {
-	if feature.Spec.Mesh.Certificate.Generate {
+	if feature.ClusterData.Mesh.Certificate.Generate {
 		meta := metav1.ObjectMeta{
-			Name:      feature.Spec.Mesh.Certificate.Name,
-			Namespace: feature.Spec.Mesh.Namespace,
+			Name:      feature.ClusterData.Mesh.Certificate.Name,
+			Namespace: feature.ClusterData.Mesh.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				feature.OwnerReference(),
 			},
@@ -31,7 +31,7 @@ func GenerateSelfSignedCertificate(feature *Feature) error {
 		}
 
 		_, err = feature.clientset.CoreV1().
-			Secrets(feature.Spec.Mesh.Namespace).
+			Secrets(feature.ClusterData.Mesh.Namespace).
 			Create(context.TODO(), cert, metav1.CreateOptions{})
 		if err != nil && !k8serrors.IsAlreadyExists(err) {
 			return errors.WithStack(err)
@@ -43,8 +43,8 @@ func GenerateSelfSignedCertificate(feature *Feature) error {
 
 func GenerateEnvoySecrets(feature *Feature) error {
 	objectMeta := metav1.ObjectMeta{
-		Name:      feature.Spec.AppNamespace + "-oauth2-tokens",
-		Namespace: feature.Spec.Mesh.Namespace,
+		Name:      feature.ClusterData.AppNamespace + "-oauth2-tokens",
+		Namespace: feature.ClusterData.Mesh.Namespace,
 		OwnerReferences: []metav1.OwnerReference{
 			feature.OwnerReference(),
 		},
@@ -68,15 +68,15 @@ func GenerateEnvoySecrets(feature *Feature) error {
 func CreateConfigMaps(feature *Feature) error {
 	if err := feature.createConfigMap("service-mesh-refs",
 		map[string]string{
-			"CONTROL_PLANE_NAME": feature.Spec.Mesh.Name,
-			"MESH_NAMESPACE":     feature.Spec.Mesh.Namespace,
+			"CONTROL_PLANE_NAME": feature.ClusterData.Mesh.Name,
+			"MESH_NAMESPACE":     feature.ClusterData.Mesh.Namespace,
 		}); err != nil {
 		return errors.WithStack(err)
 	}
 
 	if err := feature.createConfigMap("auth-refs",
 		map[string]string{
-			"AUTHORINO_LABEL": feature.Spec.Auth.Authorino.Label,
+			"AUTHORINO_LABEL": feature.ClusterData.Auth.Authorino.Label,
 		}); err != nil {
 		return errors.WithStack(err)
 	}
@@ -114,7 +114,7 @@ func EnableServiceMeshInDashboard(feature *Feature) error {
 	dashboardConfig["disableServiceMesh"] = false
 
 	_, err = feature.dynamicClient.Resource(gvr).
-		Namespace(feature.Spec.AppNamespace).
+		Namespace(feature.ClusterData.AppNamespace).
 		Update(context.Background(), &config, metav1.UpdateOptions{})
 	if err != nil {
 		log.Error(err, "Failed to update odhdashboardconfig")

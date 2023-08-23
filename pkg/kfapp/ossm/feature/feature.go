@@ -5,7 +5,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/opendatahub-io/opendatahub-operator/apis/ossm.plugins.kubeflow.org/v1alpha1"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
-	"github.com/opendatahub-io/opendatahub-operator/pkg/secret"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +26,7 @@ var log = ctrlLog.Log.WithName("ossm-features")
 type Feature struct {
 	Name        string
 	Spec        *ossmplugin.OssmPluginSpec
-	ClusterData *ClusterData
+	ClusterData *ClusterData // TODO rename
 	tracker     *v1alpha1.OssmResourceTracker
 
 	clientset     *kubernetes.Clientset
@@ -35,26 +34,17 @@ type Feature struct {
 
 	client client.Client
 
-	manifests      []manifest
-	cleanups       []cleanup
-	resources      []resourceCreator
-	preconditions  []precondition
-	postconditions []postcondition
+	manifests []manifest
 
-	loader dataLoader
+	cleanups       []action
+	resources      []action
+	preconditions  []action
+	postconditions []action
+	loaders        []action
 }
 
-// TODO not sure if we need different signatures here
-type postcondition func(feature *Feature) error
-type resourceCreator func(feature *Feature) error
-type cleanup func(feature *Feature) error
-type precondition func(feature *Feature) error
-
-type dataLoader func(feature *Feature) (*ClusterData, error)
-
-func noopDataLoader(feature *Feature) (*ClusterData, error) {
-	return nil, nil
-}
+// action is a func type which can be used for different purposes while having access to Feature struct
+type action func(feature *Feature) error
 
 func (f *Feature) Apply() error {
 	// Verify all precondition and collect errors
@@ -68,13 +58,14 @@ func (f *Feature) Apply() error {
 	}
 
 	// Load necessary data
-	var err error
-	f.ClusterData, err = f.loader(f)
-	if err != nil {
-		return err
+	for _, loader := range f.loaders {
+		multiErr = multierror.Append(multiErr, loader(f))
+	}
+	if multiErr.ErrorOrNil() != nil {
+		return multiErr.ErrorOrNil()
 	}
 
-	// Create resources
+	// create or update resources
 	for _, resource := range f.resources {
 		if err := resource(f); err != nil {
 			return err
@@ -126,7 +117,7 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfgMapName,
-			Namespace: f.Spec.AppNamespace,
+			Namespace: f.ClusterData.AppNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				f.tracker.ToOwnerReference(),
 			},
@@ -155,7 +146,7 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 	return nil
 }
 
-func (f *Feature) addCleanup(cleanupFuncs ...cleanup) {
+func (f *Feature) addCleanup(cleanupFuncs ...action) {
 	f.cleanups = append(f.cleanups, cleanupFuncs...)
 }
 
@@ -202,7 +193,7 @@ func (f *Feature) createResourceTracker() error {
 			Kind:       "OssmResourceTracker",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: f.Spec.AppNamespace + "-" + convertToRFC1123Subdomain(f.Name),
+			Name: f.ClusterData.AppNamespace + "-" + convertToRFC1123Subdomain(f.Name),
 		},
 	}
 
@@ -264,50 +255,4 @@ type ClusterData struct {
 	OAuth oAuth
 	Domain,
 	AppNamespace string
-}
-
-// TODO slice it to smaller loaders
-func LoadClusterData(feature *Feature) (*ClusterData, error) {
-	data := &ClusterData{
-		AppNamespace: feature.Spec.AppNamespace,
-	}
-
-	data.OssmPluginSpec = feature.Spec
-
-	if domain, err := GetDomain(feature.dynamicClient); err == nil {
-		data.Domain = domain
-	} else {
-		return nil, errors.WithStack(err)
-	}
-
-	var err error
-
-	var clientSecret, hmac *secret.Secret
-	if clientSecret, err = secret.NewSecret("ossm-odh-oauth", "random", 32); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	if hmac, err = secret.NewSecret("ossm-odh-hmac", "random", 32); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	if oauthServerDetailsJson, err := GetOAuthServerDetails(); err == nil {
-		hostName, port, errUrlParsing := ExtractHostNameAndPort(oauthServerDetailsJson.Get("issuer").MustString("issuer"))
-		if errUrlParsing != nil {
-			return nil, errUrlParsing
-		}
-
-		data.OAuth = oAuth{
-			AuthzEndpoint: oauthServerDetailsJson.Get("authorization_endpoint").MustString("authorization_endpoint"),
-			TokenEndpoint: oauthServerDetailsJson.Get("token_endpoint").MustString("token_endpoint"),
-			Route:         hostName,
-			Port:          port,
-			ClientSecret:  clientSecret.Value,
-			Hmac:          hmac.Value,
-		}
-	} else {
-		return nil, errors.WithStack(err)
-	}
-
-	return data, nil
 }

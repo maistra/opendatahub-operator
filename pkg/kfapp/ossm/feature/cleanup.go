@@ -10,7 +10,7 @@ import (
 )
 
 func RemoveTokenVolumes(feature *Feature) error {
-	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.Spec.AppNamespace)
+	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.ClusterData.AppNamespace)
 
 	gvr := schema.GroupVersionResource{
 		Group:    "maistra.io",
@@ -18,7 +18,10 @@ func RemoveTokenVolumes(feature *Feature) error {
 		Resource: "servicemeshcontrolplanes",
 	}
 
-	smcp, err := feature.dynamicClient.Resource(gvr).Namespace(feature.Spec.Mesh.Namespace).Get(context.Background(), feature.Spec.Mesh.Name, metav1.GetOptions{})
+	meshNs := feature.ClusterData.Mesh.Namespace
+	meshName := feature.ClusterData.Mesh.Name
+
+	smcp, err := feature.dynamicClient.Resource(gvr).Namespace(meshNs).Get(context.Background(), meshName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -27,7 +30,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 		return err
 	}
 	if !found {
-		log.Info("no volumes found", "smcp", feature.Spec.Mesh.Name, "istio-ns", feature.Spec.Mesh.Namespace)
+		log.Info("no volumes found", "smcp", meshName, "istio-ns", meshNs)
 		return nil
 	}
 
@@ -57,7 +60,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 		}
 	}
 
-	_, err = feature.dynamicClient.Resource(gvr).Namespace(feature.Spec.Mesh.Namespace).Update(context.Background(), smcp, metav1.UpdateOptions{})
+	_, err = feature.dynamicClient.Resource(gvr).Namespace(meshNs).Update(context.Background(), smcp, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -66,7 +69,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 }
 
 func RemoveOAuthClient(feature *Feature) error {
-	oauthClientName := fmt.Sprintf("%s-oauth2-client", feature.Spec.AppNamespace)
+	oauthClientName := fmt.Sprintf("%s-oauth2-client", feature.ClusterData.AppNamespace)
 	gvr := schema.GroupVersionResource{
 		Group:    "oauth.openshift.io",
 		Version:  "v1",
@@ -90,7 +93,7 @@ func RemoveOAuthClient(feature *Feature) error {
 }
 
 func RemoveExtensionProvider(feature *Feature) error {
-	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.Spec.AppNamespace)
+	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.ClusterData.AppNamespace)
 
 	gvr := schema.GroupVersionResource{
 		Group:    "maistra.io",
@@ -98,7 +101,7 @@ func RemoveExtensionProvider(feature *Feature) error {
 		Resource: "servicemeshcontrolplanes",
 	}
 
-	mesh := feature.Spec.Mesh
+	mesh := feature.ClusterData.Mesh
 
 	smcp, err := feature.dynamicClient.Resource(gvr).
 		Namespace(mesh.Namespace).

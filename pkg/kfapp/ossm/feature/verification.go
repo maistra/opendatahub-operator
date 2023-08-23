@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func EnsureCRDIsInstalled(group string, version string, resource string) precondition {
+func EnsureCRDIsInstalled(group string, version string, resource string) action {
 	return func(f *Feature) error {
 		crdGVR := schema.GroupVersionResource{
 			Group:    group,
@@ -29,8 +29,8 @@ func EnsureServiceMeshInstalled(feature *Feature) error {
 		return err
 	}
 
-	smcp := feature.Spec.Mesh.Name
-	smcpNs := feature.Spec.Mesh.Namespace
+	smcp := feature.ClusterData.Mesh.Name
+	smcpNs := feature.ClusterData.Mesh.Namespace
 
 	status, err := checkSMCPStatus(feature.dynamicClient, smcp, smcpNs)
 	if err != nil {

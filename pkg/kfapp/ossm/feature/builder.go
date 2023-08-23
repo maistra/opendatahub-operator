@@ -21,11 +21,16 @@ func CreateFeature(name string) *featureBuilder {
 }
 
 func (fb *featureBuilder) For(spec *ossmplugin.OssmPluginSpec) *featureBuilder {
-	fb.builders = append(fb.builders, func(f *Feature) error {
-		f.Spec = spec
+	createSpec := func(f *Feature) error {
+		f.ClusterData = &ClusterData{
+			OssmPluginSpec: spec,
+		}
 
 		return nil
-	})
+	}
+
+	// Ensures creation of .Spec object is always invoked first
+	fb.builders = append([]partialBuilder{createSpec}, fb.builders...)
 
 	return fb
 }
@@ -66,7 +71,7 @@ func (fb *featureBuilder) FromPaths(paths ...string) *featureBuilder {
 			}
 		}
 
-		f.manifests = manifests
+		f.manifests = append(f.manifests, manifests...)
 
 		return nil
 	})
@@ -74,9 +79,9 @@ func (fb *featureBuilder) FromPaths(paths ...string) *featureBuilder {
 	return fb
 }
 
-func (fb *featureBuilder) WithData(loader dataLoader) *featureBuilder {
+func (fb *featureBuilder) WithData(loader ...action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
-		f.loader = loader
+		f.loaders = append(f.loaders, loader...)
 
 		return nil
 	})
@@ -84,9 +89,9 @@ func (fb *featureBuilder) WithData(loader dataLoader) *featureBuilder {
 	return fb
 }
 
-func (fb *featureBuilder) Preconditions(preconditions ...precondition) *featureBuilder {
+func (fb *featureBuilder) Preconditions(preconditions ...action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
-		f.preconditions = preconditions
+		f.preconditions = append(f.preconditions, preconditions...)
 
 		return nil
 	})
@@ -94,7 +99,7 @@ func (fb *featureBuilder) Preconditions(preconditions ...precondition) *featureB
 	return fb
 }
 
-func (fb *featureBuilder) OnDelete(cleanups ...cleanup) *featureBuilder {
+func (fb *featureBuilder) OnDelete(cleanups ...action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		f.addCleanup(cleanups...)
 
@@ -104,7 +109,7 @@ func (fb *featureBuilder) OnDelete(cleanups ...cleanup) *featureBuilder {
 	return fb
 }
 
-func (fb *featureBuilder) AdditionalResources(resources ...resourceCreator) *featureBuilder {
+func (fb *featureBuilder) AdditionalResources(resources ...action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		f.resources = resources
 
@@ -116,8 +121,7 @@ func (fb *featureBuilder) AdditionalResources(resources ...resourceCreator) *fea
 
 func (fb *featureBuilder) Load() (*Feature, error) {
 	feature := &Feature{
-		Name:   fb.name,
-		loader: noopDataLoader,
+		Name: fb.name,
 	}
 
 	for i := range fb.builders {

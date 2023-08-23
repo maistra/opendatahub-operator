@@ -250,8 +250,7 @@ func convertToRFC1123Subdomain(input string) string {
 
 type Spec struct {
 	*ossmplugin.OssmPluginSpec
-	OAuth oAuth
-	Domain,
-	AppNamespace string
+	OAuth   oAuth
+	Domain  string
 	Tracker *v1alpha1.OssmResourceTracker
 }

@@ -101,7 +101,7 @@ func (o *OssmInstaller) enableFeatures() error {
 			feature.GenerateSelfSignedCertificate,
 			feature.GenerateEnvoySecrets,
 		).
-		WithData(feature.LoadClusterData).
+		WithData(feature.LoadClusterDetails, feature.LoadOAuthDetails).
 		Preconditions(
 			feature.EnsureCRDIsInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"),
 			feature.EnsureServiceMeshInstalled,
@@ -132,7 +132,7 @@ func (o *OssmInstaller) enableFeatures() error {
 			path.Join(rootDir, feature.ControlPlaneDir, "smm.tmpl"),
 			path.Join(rootDir, feature.ControlPlaneDir, "namespace.patch.tmpl"),
 		).
-		WithData(feature.LoadClusterData).
+		WithData(feature.LoadClusterDetails).
 		Load(); err != nil {
 		return err
 	} else {
@@ -170,7 +170,7 @@ func (o *OssmInstaller) enableFeatures() error {
 			path.Join(rootDir, feature.AuthDir, "rbac"),
 			path.Join(rootDir, feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
 		).
-		WithData(feature.LoadClusterData).
+		WithData(feature.LoadClusterDetails).
 		OnDelete(feature.RemoveExtensionProvider).
 		Load(); err != nil {
 		return err

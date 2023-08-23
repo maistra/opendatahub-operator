@@ -5,8 +5,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO slice it to smaller loaders
-func LoadClusterData(feature *Feature) error {
+func LoadClusterDetails(feature *Feature) error {
 	data := feature.Spec
 
 	if domain, err := GetDomain(feature.dynamicClient); err == nil {
@@ -15,9 +14,13 @@ func LoadClusterData(feature *Feature) error {
 		return errors.WithStack(err)
 	}
 
-	var err error
+	return nil
+}
 
-	// TODO this is OAuth only data from now on
+func LoadOAuthDetails(feature *Feature) error {
+	data := feature.Spec
+
+	var err error
 	var clientSecret, hmac *secret.Secret
 	if clientSecret, err = secret.NewSecret("ossm-odh-oauth", "random", 32); err != nil {
 		return errors.WithStack(err)
@@ -44,6 +47,6 @@ func LoadClusterData(feature *Feature) error {
 	} else {
 		return errors.WithStack(err)
 	}
-	//
+
 	return nil
 }

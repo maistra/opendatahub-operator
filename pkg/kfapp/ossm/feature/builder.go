@@ -69,9 +69,9 @@ func (fb *featureBuilder) FromPaths(paths ...string) *featureBuilder {
 			if err != nil {
 				return errors.WithStack(err)
 			}
-		}
 
-		f.manifests = append(f.manifests, manifests...)
+			f.manifests = append(f.manifests, manifests...)
+		}
 
 		return nil
 	})

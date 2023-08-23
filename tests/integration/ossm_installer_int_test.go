@@ -50,8 +50,8 @@ var _ = Describe("Migrating", func() {
 
 		migrationFeature, err = feature.CreateFeature("datascience-project-migration").
 			For(ossmPluginSpec).
-			WithConfig(envTest.Config).
-			AdditionalResources(feature.MigrateDataScienceProjects).Load()
+			UsingConfig(envTest.Config).
+			WithResources(feature.MigratedDataScienceProjects).Load()
 
 		Expect(err).ToNot(HaveOccurred())
 
@@ -145,7 +145,7 @@ var _ = Describe("Checking for CRD", func() {
 		var err error
 		verificationFeature, err = feature.CreateFeature("CRD verification").
 			For(ossmPluginSpec).
-			WithConfig(envTest.Config).
+			UsingConfig(envTest.Config).
 			Preconditions(feature.EnsureCRDIsInstalled(crdGroup, crdVersion, crdResource)).
 			Load()
 		Expect(err).ToNot(HaveOccurred())
@@ -166,7 +166,7 @@ var _ = Describe("Checking for CRD", func() {
 		var err error
 		verificationFeature, err = feature.CreateFeature("CRD verification").
 			For(ossmPluginSpec).
-			WithConfig(envTest.Config).
+			UsingConfig(envTest.Config).
 			Preconditions(feature.EnsureCRDIsInstalled(crdGroup, crdVersion, crdResource)).
 			Load()
 		Expect(err).ToNot(HaveOccurred())
@@ -208,7 +208,7 @@ var _ = Describe("Ensuring environment is set up correctly", func() {
 
 		serviceMeshCheck, err = feature.CreateFeature("datascience-project-migration").
 			For(ossmPluginSpec).
-			WithConfig(envTest.Config).
+			UsingConfig(envTest.Config).
 			Preconditions(feature.EnsureServiceMeshInstalled).Load()
 
 		Expect(err).ToNot(HaveOccurred())

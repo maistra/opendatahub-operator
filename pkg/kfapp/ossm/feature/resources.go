@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func GenerateSelfSignedCertificate(feature *Feature) error {
+func SelfSignedCertificate(feature *Feature) error {
 	if feature.Spec.Mesh.Certificate.Generate {
 		meta := metav1.ObjectMeta{
 			Name:      feature.Spec.Mesh.Certificate.Name,
@@ -41,7 +41,7 @@ func GenerateSelfSignedCertificate(feature *Feature) error {
 	return nil
 }
 
-func GenerateEnvoySecrets(feature *Feature) error {
+func EnvoyOAuthSecrets(feature *Feature) error {
 	objectMeta := metav1.ObjectMeta{
 		Name:      feature.Spec.AppNamespace + "-oauth2-tokens",
 		Namespace: feature.Spec.Mesh.Namespace,
@@ -65,7 +65,7 @@ func GenerateEnvoySecrets(feature *Feature) error {
 	return nil
 }
 
-func CreateConfigMaps(feature *Feature) error {
+func ConfigMaps(feature *Feature) error {
 	if err := feature.createConfigMap("service-mesh-refs",
 		map[string]string{
 			"CONTROL_PLANE_NAME": feature.Spec.Mesh.Name,
@@ -84,7 +84,7 @@ func CreateConfigMaps(feature *Feature) error {
 	return nil
 }
 
-func EnableServiceMeshInDashboard(feature *Feature) error {
+func ServiceMeshEnabledInDashboard(feature *Feature) error {
 	gvr := schema.GroupVersionResource{
 		Group:    "opendatahub.io",
 		Version:  "v1alpha",
@@ -125,7 +125,7 @@ func EnableServiceMeshInDashboard(feature *Feature) error {
 	return nil
 }
 
-func MigrateDataScienceProjects(feature *Feature) error {
+func MigratedDataScienceProjects(feature *Feature) error {
 	selector := labels.SelectorFromSet(labels.Set{"opendatahub.io/dashboard": "true"})
 
 	namespaceClient := feature.clientset.CoreV1().Namespaces()

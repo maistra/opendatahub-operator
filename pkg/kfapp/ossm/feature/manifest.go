@@ -23,7 +23,7 @@ type manifest struct {
 	processed bool
 }
 
-func LoadManifestsFrom(path string) ([]manifest, error) {
+func loadManifestsFrom(path string) ([]manifest, error) {
 	var manifests []manifest
 	if err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

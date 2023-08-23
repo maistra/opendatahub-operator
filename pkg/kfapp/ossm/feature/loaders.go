@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func LoadClusterDetails(feature *Feature) error {
+func ClusterDetails(feature *Feature) error {
 	data := feature.Spec
 
 	if domain, err := GetDomain(feature.dynamicClient); err == nil {
@@ -17,7 +17,7 @@ func LoadClusterDetails(feature *Feature) error {
 	return nil
 }
 
-func LoadOAuthDetails(feature *Feature) error {
+func OAuthConfig(feature *Feature) error {
 	data := feature.Spec
 
 	var err error

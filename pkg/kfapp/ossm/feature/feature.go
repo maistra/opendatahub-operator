@@ -107,9 +107,6 @@ func (f *Feature) applyManifests() error {
 	return applyErrors.ErrorOrNil()
 }
 
-// FIXME not quite sure it belongs to a feature. Should be something "resource creator" facade instead
-// including stuff below
-// TMP to make stuff working
 func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) error {
 
 	configMap := &corev1.ConfigMap{
@@ -117,7 +114,7 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 			Name:      cfgMapName,
 			Namespace: f.Spec.AppNamespace,
 			OwnerReferences: []metav1.OwnerReference{
-				f.Spec.Tracker.ToOwnerReference(),
+				f.OwnerReference(),
 			},
 		},
 		Data: data,

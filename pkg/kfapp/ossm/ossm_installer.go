@@ -91,17 +91,17 @@ func (o *OssmInstaller) enableFeatures() error {
 
 	if oauth, err := feature.CreateFeature("control-plane-oauth").
 		For(o.PluginSpec).
-		WithConfig(o.config).
-		FromPaths(
+		UsingConfig(o.config).
+		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "base"),
 			path.Join(rootDir, feature.ControlPlaneDir, "oauth"),
 			path.Join(rootDir, feature.ControlPlaneDir, "filters"),
 		).
-		AdditionalResources(
-			feature.GenerateSelfSignedCertificate,
-			feature.GenerateEnvoySecrets,
+		WithResources(
+			feature.SelfSignedCertificate,
+			feature.EnvoyOAuthSecrets,
 		).
-		WithData(feature.LoadClusterDetails, feature.LoadOAuthDetails).
+		WithData(feature.ClusterDetails, feature.OAuthConfig).
 		Preconditions(
 			feature.EnsureCRDIsInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"),
 			feature.EnsureServiceMeshInstalled,
@@ -117,8 +117,8 @@ func (o *OssmInstaller) enableFeatures() error {
 
 	if cfMaps, err := feature.CreateFeature("shared-config-maps").
 		For(o.PluginSpec).
-		WithConfig(o.config).
-		AdditionalResources(feature.CreateConfigMaps).
+		UsingConfig(o.config).
+		WithResources(feature.ConfigMaps).
 		Load(); err != nil {
 		return err
 	} else {
@@ -127,12 +127,12 @@ func (o *OssmInstaller) enableFeatures() error {
 
 	if serviceMesh, err := feature.CreateFeature("enable-service-mesh").
 		For(o.PluginSpec).
-		WithConfig(o.config).
-		FromPaths(
+		UsingConfig(o.config).
+		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "smm.tmpl"),
 			path.Join(rootDir, feature.ControlPlaneDir, "namespace.patch.tmpl"),
 		).
-		WithData(feature.LoadClusterDetails).
+		WithData(feature.ClusterDetails).
 		Load(); err != nil {
 		return err
 	} else {
@@ -141,8 +141,8 @@ func (o *OssmInstaller) enableFeatures() error {
 
 	if dashboard, err := feature.CreateFeature("enable-service-mesh-for-dashboard").
 		For(o.PluginSpec).
-		WithConfig(o.config).
-		AdditionalResources(feature.EnableServiceMeshInDashboard).
+		UsingConfig(o.config).
+		WithResources(feature.ServiceMeshEnabledInDashboard).
 		Load(); err != nil {
 		return err
 	} else {
@@ -151,9 +151,8 @@ func (o *OssmInstaller) enableFeatures() error {
 
 	if dataScienceProjects, err := feature.CreateFeature("migrate-data-science-projects").
 		For(o.PluginSpec).
-		WithConfig(o.config).
-		// TODO this is not creating any resource - it is updating it
-		AdditionalResources(feature.MigrateDataScienceProjects).
+		UsingConfig(o.config).
+		WithResources(feature.MigratedDataScienceProjects).
 		Load(); err != nil {
 		return err
 	} else {
@@ -162,15 +161,15 @@ func (o *OssmInstaller) enableFeatures() error {
 
 	if extAuthz, err := feature.CreateFeature("setup-external-authorization").
 		For(o.PluginSpec).
-		WithConfig(o.config).
-		FromPaths(
+		UsingConfig(o.config).
+		Manifests(
 			path.Join(rootDir, feature.AuthDir, "namespace.tmpl"),
 			path.Join(rootDir, feature.AuthDir, "auth-smm.tmpl"),
 			path.Join(rootDir, feature.AuthDir, "base"),
 			path.Join(rootDir, feature.AuthDir, "rbac"),
 			path.Join(rootDir, feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
 		).
-		WithData(feature.LoadClusterDetails).
+		WithData(feature.ClusterDetails).
 		OnDelete(feature.RemoveExtensionProvider).
 		Load(); err != nil {
 		return err

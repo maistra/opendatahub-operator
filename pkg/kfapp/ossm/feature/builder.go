@@ -35,7 +35,7 @@ func (fb *featureBuilder) For(spec *ossmplugin.OssmPluginSpec) *featureBuilder {
 	return fb
 }
 
-func (fb *featureBuilder) WithConfig(config *rest.Config) *featureBuilder {
+func (fb *featureBuilder) UsingConfig(config *rest.Config) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		var err error
 		f.clientset, err = kubernetes.NewForConfig(config)
@@ -59,13 +59,13 @@ func (fb *featureBuilder) WithConfig(config *rest.Config) *featureBuilder {
 	return fb
 }
 
-func (fb *featureBuilder) FromPaths(paths ...string) *featureBuilder {
+func (fb *featureBuilder) Manifests(paths ...string) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		var err error
 		var manifests []manifest
 
 		for _, path := range paths {
-			manifests, err = LoadManifestsFrom(path)
+			manifests, err = loadManifestsFrom(path)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -109,7 +109,7 @@ func (fb *featureBuilder) OnDelete(cleanups ...action) *featureBuilder {
 	return fb
 }
 
-func (fb *featureBuilder) AdditionalResources(resources ...action) *featureBuilder {
+func (fb *featureBuilder) WithResources(resources ...action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		f.resources = resources
 

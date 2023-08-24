@@ -226,7 +226,7 @@ var _ = Describe("Data Science Project Migration", func() {
 
 var _ = Describe("Cleanup operations", func() {
 
-	Context("setting oauth for control plane", func() {
+	Context("configuring control plane for auth(z)", func() {
 
 		var (
 			objectCleaner  *testenv.Cleaner
@@ -249,7 +249,7 @@ var _ = Describe("Cleanup operations", func() {
 			ossmPluginSpec.Mesh.Namespace = namespace
 		})
 
-		It("should remove mounted secret volumes", func() {
+		It("should be able to remove mounted secret volumes on cleanup", func() {
 			// given
 			ns := createNamespace(namespace)
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
@@ -259,7 +259,7 @@ var _ = Describe("Cleanup operations", func() {
 
 			controlPlaneWithSecretVolumes, err := feature.CreateFeature("control-plane-with-secret-volumes").
 				For(ossmPluginSpec).
-				Manifests(inTestTmpDir("control-plane/base/control-plane-ingress.patch.tmpl")).
+				Manifests(inTestTmpDir(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl"))).
 				UsingConfig(envTest.Config).
 				Load()
 
@@ -278,6 +278,54 @@ var _ = Describe("Cleanup operations", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(found).To(BeTrue())
 			Expect(volumes).To(BeEmpty())
+		})
+
+		It("should be able to remove external provider on cleanup", func() {
+			// given
+			ns := createNamespace(namespace)
+			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+			defer objectCleaner.DeleteAll(ns)
+
+			ossmPluginSpec.Auth.Namespace = "test-provider"
+			ossmPluginSpec.Auth.Authorino.Name = "authorino"
+
+			createServiceMeshControlPlane(name, namespace)
+
+			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("control-plane-with-external-authz-provider").
+				For(ossmPluginSpec).
+				Manifests(inTestTmpDir(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"))).
+				UsingConfig(envTest.Config).
+				Load()
+
+			Expect(err).ToNot(HaveOccurred())
+
+			// when
+			By("verifying extension provider has been added after applying feature", func() {
+				Expect(controlPlaneWithExtAuthzProvider.Apply()).ToNot(HaveOccurred())
+				serviceMeshControlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
+				Expect(err).ToNot(HaveOccurred())
+
+				extensionProviders, found, err := unstructured.NestedSlice(serviceMeshControlPlane.Object, "spec", "techPreview", "meshConfig", "extensionProviders")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(found).To(BeTrue())
+
+				extensionProvider := extensionProviders[0].(map[string]interface{})
+				Expect(extensionProvider["name"]).To(Equal("test-odh-auth-provider"))
+				Expect(extensionProvider["envoyExtAuthzGrpc"].(map[string]interface{})["service"]).To(Equal("authorino-authorino-authorization.test-provider.svc.cluster.local"))
+			})
+
+			// then
+			By("verifying that extension provider has been removed", func() {
+				err = feature.RemoveExtensionProvider(controlPlaneWithExtAuthzProvider)
+				serviceMeshControlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
+				Expect(err).ToNot(HaveOccurred())
+
+				extensionProviders, found, err := unstructured.NestedSlice(serviceMeshControlPlane.Object, "spec", "techPreview", "meshConfig", "extensionProviders")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(found).To(BeTrue())
+				Expect(extensionProviders).To(BeEmpty())
+			})
+
 		})
 
 	})
@@ -418,7 +466,7 @@ func inTestTmpDir(fileName string) string {
 		Fail(err.Error())
 	}
 
-	src := path.Join(root, "pkg/kfapp/ossm/templates/", fileName)
+	src := path.Join(root, "pkg/kfapp/ossm", fileName)
 	dest := path.Join(tmpDir, fileName)
 	if err := copyFile(src, dest); err != nil {
 		Fail(err.Error())

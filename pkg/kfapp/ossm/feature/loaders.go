@@ -36,7 +36,7 @@ func OAuthConfig(feature *Feature) error {
 			return errUrlParsing
 		}
 
-		data.OAuth = oAuth{
+		data.OAuth = OAuth{
 			AuthzEndpoint: oauthServerDetailsJson.Get("authorization_endpoint").MustString("authorization_endpoint"),
 			TokenEndpoint: oauthServerDetailsJson.Get("token_endpoint").MustString("token_endpoint"),
 			Route:         hostName,

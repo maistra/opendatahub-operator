@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opendatahub-io/opendatahub-operator/apis/ossm.plugins.kubeflow.org/v1alpha1"
-	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,11 +28,9 @@ type Feature struct {
 
 	clientset     *kubernetes.Clientset
 	dynamicClient dynamic.Interface
+	client        client.Client
 
-	client client.Client
-
-	manifests []manifest
-
+	manifests      []manifest
 	cleanups       []action
 	resources      []action
 	preconditions  []action
@@ -243,11 +240,4 @@ func convertToRFC1123Subdomain(input string) string {
 
 	// Convert the result to lowercase
 	return strings.ToLower(replaced)
-}
-
-type Spec struct {
-	*ossmplugin.OssmPluginSpec
-	OAuth   oAuth
-	Domain  string
-	Tracker *v1alpha1.OssmResourceTracker
 }

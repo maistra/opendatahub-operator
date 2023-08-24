@@ -27,7 +27,7 @@ resources:
       inline_bytes: "{{ .Secret }}"
 `
 
-func createEnvoySecret(oAuth oAuth, objectMeta metav1.ObjectMeta) (*corev1.Secret, error) {
+func createEnvoySecret(oAuth OAuth, objectMeta metav1.ObjectMeta) (*corev1.Secret, error) {
 
 	clientSecret, err := processInlineTemplate(tokenSecret, struct{ Secret string }{Secret: oAuth.ClientSecret})
 	if err != nil {

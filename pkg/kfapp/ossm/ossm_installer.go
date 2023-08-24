@@ -89,7 +89,7 @@ func (o *OssmInstaller) enableFeatures() error {
 		return internalError(errors.WithStack(err))
 	}
 
-	if oauth, err := feature.CreateFeature("control-plane-oauth").
+	if oauth, err := feature.CreateFeature("control-plane-configure-oauth").
 		For(o.PluginSpec).
 		UsingConfig(o.config).
 		Manifests(
@@ -125,7 +125,7 @@ func (o *OssmInstaller) enableFeatures() error {
 		o.features = append(o.features, cfMaps)
 	}
 
-	if serviceMesh, err := feature.CreateFeature("enable-service-mesh").
+	if serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
 		For(o.PluginSpec).
 		UsingConfig(o.config).
 		Manifests(
@@ -139,7 +139,7 @@ func (o *OssmInstaller) enableFeatures() error {
 		o.features = append(o.features, serviceMesh)
 	}
 
-	if dashboard, err := feature.CreateFeature("enable-service-mesh-for-dashboard").
+	if dashboard, err := feature.CreateFeature("app-enable-service-mesh-in-dashboard").
 		For(o.PluginSpec).
 		UsingConfig(o.config).
 		WithResources(feature.ServiceMeshEnabledInDashboard).
@@ -149,7 +149,7 @@ func (o *OssmInstaller) enableFeatures() error {
 		o.features = append(o.features, dashboard)
 	}
 
-	if dataScienceProjects, err := feature.CreateFeature("migrate-data-science-projects").
+	if dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
 		For(o.PluginSpec).
 		UsingConfig(o.config).
 		WithResources(feature.MigratedDataScienceProjects).
@@ -159,7 +159,7 @@ func (o *OssmInstaller) enableFeatures() error {
 		o.features = append(o.features, dataScienceProjects)
 	}
 
-	if extAuthz, err := feature.CreateFeature("setup-external-authorization").
+	if extAuthz, err := feature.CreateFeature("control-plane-setup-external-authorization").
 		For(o.PluginSpec).
 		UsingConfig(o.config).
 		Manifests(
@@ -192,8 +192,6 @@ func (o *OssmInstaller) Generate(_ kftypesv3.ResourceEnum) error {
 }
 
 func (o *OssmInstaller) CleanupResources() error {
-	// FIXME delete owner tracker
-
 	var cleanupErrors *multierror.Error
 	for _, f := range o.features {
 		cleanupErrors = multierror.Append(cleanupErrors, f.Cleanup())

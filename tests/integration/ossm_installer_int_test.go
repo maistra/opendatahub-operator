@@ -2,6 +2,8 @@ package ossm_test
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfapp/ossm"
@@ -9,6 +11,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig"
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/opendatahub-io/opendatahub-operator/tests/integration/testenv"
+	"io"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +19,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"os"
 	"path"
+	"path/filepath"
 	"time"
 )
 
@@ -229,7 +234,6 @@ var _ = Describe("Cleanup operations", func() {
 			ossmPluginSpec *ossmplugin.OssmPluginSpec
 			namespace      = "test"
 			name           = "minimal"
-			projectDir     string
 		)
 
 		BeforeEach(func() {
@@ -243,10 +247,6 @@ var _ = Describe("Cleanup operations", func() {
 
 			ossmPluginSpec.Mesh.Name = name
 			ossmPluginSpec.Mesh.Namespace = namespace
-
-			projectDir, err = findProjectRoot()
-			Expect(err).ToNot(HaveOccurred())
-
 		})
 
 		It("should remove mounted secret volumes", func() {
@@ -259,7 +259,7 @@ var _ = Describe("Cleanup operations", func() {
 
 			controlPlaneWithSecretVolumes, err := feature.CreateFeature("control-plane-with-secret-volumes").
 				For(ossmPluginSpec).
-				Manifests(path.Join(projectDir, "pkg/kfapp/ossm/templates/control-plane/base/control-plane-ingress.patch.tmpl")).
+				Manifests(inTestTmpDir("control-plane/base/control-plane-ingress.patch.tmpl")).
 				UsingConfig(envTest.Config).
 				Load()
 
@@ -407,4 +407,49 @@ func getServiceMeshControlPlane(cfg *rest.Config, namespace, name string) (*unst
 	}
 
 	return smcp, nil
+}
+
+func inTestTmpDir(fileName string) string {
+	root, err := findProjectRoot()
+	Expect(err).ToNot(HaveOccurred())
+
+	tmpDir := filepath.Join(os.TempDir(), randomUUIDName(16))
+	if err := os.Mkdir(tmpDir, os.ModePerm); err != nil {
+		Fail(err.Error())
+	}
+
+	src := path.Join(root, "pkg/kfapp/ossm/templates/", fileName)
+	dest := path.Join(tmpDir, fileName)
+	if err := copyFile(src, dest); err != nil {
+		Fail(err.Error())
+	}
+
+	return dest
+}
+
+func copyFile(src, dst string) error {
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), os.ModePerm); err != nil {
+		return err
+	}
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
+}
+
+func randomUUIDName(len int) string {
+	uuidBytes := make([]byte, len)
+	_, _ = rand.Read(uuidBytes)
+	return hex.EncodeToString(uuidBytes)[:len]
 }

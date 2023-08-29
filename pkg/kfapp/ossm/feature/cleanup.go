@@ -9,19 +9,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+var smcpGVR = schema.GroupVersionResource{
+	Group:    "maistra.io",
+	Version:  "v2",
+	Resource: "servicemeshcontrolplanes",
+}
+
 func RemoveTokenVolumes(feature *Feature) error {
 	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.Spec.AppNamespace)
-
-	gvr := schema.GroupVersionResource{
-		Group:    "maistra.io",
-		Version:  "v2",
-		Resource: "servicemeshcontrolplanes",
-	}
 
 	meshNs := feature.Spec.Mesh.Namespace
 	meshName := feature.Spec.Mesh.Name
 
-	smcp, err := feature.dynamicClient.Resource(gvr).Namespace(meshNs).Get(context.Background(), meshName, metav1.GetOptions{})
+	smcp, err := feature.dynamicClient.Resource(smcpGVR).Namespace(meshNs).Get(context.Background(), meshName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 		}
 	}
 
-	_, err = feature.dynamicClient.Resource(gvr).Namespace(meshNs).Update(context.Background(), smcp, metav1.UpdateOptions{})
+	_, err = feature.dynamicClient.Resource(smcpGVR).Namespace(meshNs).Update(context.Background(), smcp, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -95,15 +95,9 @@ func RemoveOAuthClient(feature *Feature) error {
 func RemoveExtensionProvider(feature *Feature) error {
 	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.Spec.AppNamespace)
 
-	gvr := schema.GroupVersionResource{
-		Group:    "maistra.io",
-		Version:  "v2",
-		Resource: "servicemeshcontrolplanes",
-	}
-
 	mesh := feature.Spec.Mesh
 
-	smcp, err := feature.dynamicClient.Resource(gvr).
+	smcp, err := feature.dynamicClient.Resource(smcpGVR).
 		Namespace(mesh.Namespace).
 		Get(context.Background(), mesh.Name, metav1.GetOptions{})
 	if err != nil {
@@ -136,7 +130,7 @@ func RemoveExtensionProvider(feature *Feature) error {
 		}
 	}
 
-	_, err = feature.dynamicClient.Resource(gvr).
+	_, err = feature.dynamicClient.Resource(smcpGVR).
 		Namespace(mesh.Namespace).
 		Update(context.Background(), smcp, metav1.UpdateOptions{})
 

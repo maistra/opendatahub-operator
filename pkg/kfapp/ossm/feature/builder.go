@@ -119,6 +119,16 @@ func (fb *featureBuilder) WithResources(resources ...action) *featureBuilder {
 	return fb
 }
 
+func (fb *featureBuilder) EnabledIf(enabled func(f *Feature) bool) *featureBuilder {
+	fb.builders = append(fb.builders, func(f *Feature) error {
+		f.Enabled = enabled(f)
+
+		return nil
+
+	})
+	return fb
+}
+
 func (fb *featureBuilder) Load() (*Feature, error) {
 	feature := &Feature{
 		Name: fb.name,
@@ -128,6 +138,10 @@ func (fb *featureBuilder) Load() (*Feature, error) {
 		if err := fb.builders[i](feature); err != nil {
 			return nil, err
 		}
+	}
+
+	if !feature.Enabled {
+		return feature, nil
 	}
 
 	if err := feature.createResourceTracker(); err != nil {

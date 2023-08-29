@@ -23,8 +23,9 @@ import (
 var log = ctrlLog.Log.WithName("ossm-features")
 
 type Feature struct {
-	Name string
-	Spec *Spec
+	Name    string
+	Spec    *Spec
+	Enabled bool
 
 	clientset     *kubernetes.Clientset
 	dynamicClient dynamic.Interface
@@ -42,6 +43,13 @@ type Feature struct {
 type action func(feature *Feature) error
 
 func (f *Feature) Apply() error {
+
+	if !f.Enabled {
+		log.Info("feature is disabled, skipping.", "name", f.Name)
+
+		return nil
+	}
+
 	// Verify all precondition and collect errors
 	var multiErr *multierror.Error
 	for _, precondition := range f.preconditions {

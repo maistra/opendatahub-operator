@@ -51,6 +51,8 @@ func WaitForControlPlaneToBeReady(feature *Feature) error {
 	return wait.PollImmediate(250*time.Millisecond, 5*time.Minute, func() (done bool, err error) {
 		smcp := feature.Spec.Mesh.Name
 		smcpNs := feature.Spec.Mesh.Namespace
+
+		log.Info("polling for control plane to be ready", "name", smcp, "namespace", smcpNs)
 		status, err := CheckControlPlaneStatus(feature.dynamicClient, smcp, smcpNs)
 
 		return status == "Ready", err
@@ -58,9 +60,9 @@ func WaitForControlPlaneToBeReady(feature *Feature) error {
 }
 
 func CheckControlPlaneStatus(dynamicClient dynamic.Interface, name, namespace string) (string, error) {
-	unstructObj, err := dynamicClient.Resource(smcpGVR).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	unstructObj, err := dynamicClient.Resource(smcpGVR).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		log.Info("Failed to find SMCP")
+		log.Info("Failed to find Service Mesh Control Plane")
 
 		return "", err
 	}

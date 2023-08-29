@@ -89,7 +89,7 @@ func (o *OssmInstaller) enableFeatures() error {
 		return internalError(errors.WithStack(err))
 	}
 
-	if smcpInstallation, err := feature.CreateFeature("install-control-plane").
+	if smcpInstallation, err := feature.CreateFeature("control-plane-install-managed").
 		For(o.PluginSpec).
 		UsingConfig(o.config).
 		Manifests(
@@ -106,7 +106,6 @@ func (o *OssmInstaller) enableFeatures() error {
 		Postconditions(
 			feature.WaitForControlPlaneToBeReady,
 		).
-		OnDelete(feature.DeleteControlPlane).
 		Load(); err != nil {
 		return err
 	} else {
@@ -222,6 +221,7 @@ func (o *OssmInstaller) CleanupResources() error {
 	// between the features when it comes to clean-up. This is based on the assumption, that features
 	// are created in the correct order or are self-contained.
 	for i := len(o.features) - 1; i >= 0; i-- {
+		log.Info("cleanup", "name", o.features[i].Name)
 		cleanupErrors = multierror.Append(cleanupErrors, o.features[i].Cleanup())
 	}
 

@@ -141,7 +141,8 @@ func (fb *featureBuilder) EnabledIf(enabled func(f *Feature) bool) *featureBuild
 
 func (fb *featureBuilder) Load() (*Feature, error) {
 	feature := &Feature{
-		Name: fb.name,
+		Name:    fb.name,
+		Enabled: true,
 	}
 
 	for i := range fb.builders {

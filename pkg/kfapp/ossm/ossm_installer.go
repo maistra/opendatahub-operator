@@ -110,7 +110,7 @@ func (o *OssmInstaller) enableFeatures() error {
 			feature.RemoveOAuthClient,
 			feature.RemoveTokenVolumes,
 		).Load(); err != nil {
-		return nil
+		return err
 	} else {
 		o.features = append(o.features, oauth)
 	}

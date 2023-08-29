@@ -137,3 +137,13 @@ func RemoveExtensionProvider(feature *Feature) error {
 	return err
 
 }
+
+func DeleteControlPlane(feature *Feature) error {
+	meshNs := feature.Spec.Mesh.Namespace
+	meshName := feature.Spec.Mesh.Name
+
+	return feature.dynamicClient.
+		Resource(smcpGVR).
+		Namespace(meshNs).
+		Delete(context.Background(), meshName, metav1.DeleteOptions{})
+}

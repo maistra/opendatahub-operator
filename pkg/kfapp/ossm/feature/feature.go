@@ -88,7 +88,13 @@ func (f *Feature) Apply() error {
 		return err
 	}
 
-	// TODO postconditions
+	for _, postcondition := range f.postconditions {
+		multiErr = multierror.Append(multiErr, postcondition(f))
+	}
+
+	if multiErr.ErrorOrNil() != nil {
+		return multiErr.ErrorOrNil()
+	}
 
 	return nil
 }

@@ -89,6 +89,30 @@ func (o *OssmInstaller) enableFeatures() error {
 		return internalError(errors.WithStack(err))
 	}
 
+	if smcpInstallation, err := feature.CreateFeature("install-control-plane").
+		For(o.PluginSpec).
+		UsingConfig(o.config).
+		Manifests(
+			path.Join(rootDir, feature.ControlPlaneDir, "control-plane-managed.tmpl"),
+		).
+		EnabledIf(func(f *feature.Feature) bool {
+			return f.Spec.Mesh.Mode == ossmplugin.Managed
+		}).
+		Preconditions(
+			// TODO here you need to add CRD for testing
+			feature.EnsureCRDIsInstalled("monitoring.coreos.com", "v1", "prometheuses"),
+			feature.EnsureCRDIsInstalled("maistra.io", "v2", "servicemeshcontrolplanes"),
+		).
+		Postconditions(
+			feature.WaitForControlPlaneToBeReady,
+		).
+		OnDelete(feature.DeleteControlPlane).
+		Load(); err != nil {
+		return err
+	} else {
+		o.features = append(o.features, smcpInstallation)
+	}
+
 	if oauth, err := feature.CreateFeature("control-plane-configure-oauth").
 		For(o.PluginSpec).
 		UsingConfig(o.config).
@@ -193,8 +217,12 @@ func (o *OssmInstaller) Generate(_ kftypesv3.ResourceEnum) error {
 
 func (o *OssmInstaller) CleanupResources() error {
 	var cleanupErrors *multierror.Error
-	for _, f := range o.features {
-		cleanupErrors = multierror.Append(cleanupErrors, f.Cleanup())
+	// Apply cleanups in reverse order (stack), this way e.g. we can unpatch SMCP before deleting it (if managed)
+	// Though it sounds unnecessary it keeps features isolated and there is no need to rely on the InstallationMode
+	// between the features when it comes to clean-up. This is based on the assumption, that features
+	// are created in the correct order or are self-contained.
+	for i := len(o.features) - 1; i >= 0; i-- {
+		cleanupErrors = multierror.Append(cleanupErrors, o.features[i].Cleanup())
 	}
 
 	return cleanupErrors.ErrorOrNil()

@@ -65,6 +65,10 @@ spec:
                       name:
                         type: string
                     type: object
+                  mode:
+                    description: InstallationMode defines how plugin should handle
+                      OpenShift Service Mesh.
+                    type: string
                   name:
                     type: string
                   namespace:

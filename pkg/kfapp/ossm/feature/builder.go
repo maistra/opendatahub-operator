@@ -99,6 +99,16 @@ func (fb *featureBuilder) Preconditions(preconditions ...action) *featureBuilder
 	return fb
 }
 
+func (fb *featureBuilder) Postconditions(postconditions ...action) *featureBuilder {
+	fb.builders = append(fb.builders, func(f *Feature) error {
+		f.postconditions = append(f.postconditions, postconditions...)
+
+		return nil
+	})
+
+	return fb
+}
+
 func (fb *featureBuilder) OnDelete(cleanups ...action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		f.addCleanup(cleanups...)

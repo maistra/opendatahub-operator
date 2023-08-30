@@ -207,6 +207,18 @@ func (o *OssmInstaller) enableFeatures() error {
 }
 
 func (o *OssmInstaller) Generate(_ kftypesv3.ResourceEnum) error {
+	// Not using Generate as in case of error this results in failing
+	// Delete() call leaving our resources dangling in the cluster.
+	return nil
+}
+
+func (o *OssmInstaller) Apply(_ kftypesv3.ResourceEnum) error {
+	// Plugins invoked within k8s (as a platform) won't be participating in Apply by default
+	// However, to avoid leaving all created resources not cleaned in case of failure
+	// we cannot use Generate, as this results in terminating Delete chain without
+	// Delete hook being called. There's a patched logic in coordinator.go similar to GCP one
+	// which lets us hook into Apply phase as a plugin
+
 	var applyErrors *multierror.Error
 
 	for _, f := range o.features {
@@ -217,7 +229,11 @@ func (o *OssmInstaller) Generate(_ kftypesv3.ResourceEnum) error {
 	return applyErrors.ErrorOrNil()
 }
 
-func (o *OssmInstaller) CleanupResources() error {
+func (o *OssmInstaller) Delete(resources kftypesv3.ResourceEnum) error {
+	// Plugins invoked within k8s (as a platform) won't be participating in Delete
+	// As we create resources we need to clean them up on deletion of KfDef.
+	// This is achieved by hooking into Delete() chain in coordinator.go
+
 	var cleanupErrors *multierror.Error
 	// Apply cleanups in reverse order (stack), this way e.g. we can unpatch SMCP before deleting it (if managed)
 	// Though it sounds unnecessary it keeps features isolated and there is no need to rely on the InstallationMode
@@ -229,6 +245,12 @@ func (o *OssmInstaller) CleanupResources() error {
 	}
 
 	return cleanupErrors.ErrorOrNil()
+}
+
+func (o *OssmInstaller) Dump(resources kftypesv3.ResourceEnum) error {
+	// Plugins invoked within k8s (as a platform) won't be participating in Dump
+	// This is responsibility of PackageManagers - in this case kustomize
+	return nil
 }
 
 func internalError(err error) error {

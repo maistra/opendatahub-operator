@@ -404,6 +404,22 @@ func (kfapp *coordinator) Apply(resources kftypesv3.ResourceEnum) error {
 		}
 	}
 
+	ossmApply := func() error {
+		if kfapp.KfDef.Spec.Platform != kftypesv3.OSSM {
+			return nil
+		}
+
+		if p, ok := kfapp.Platforms[kfapp.KfDef.Spec.Platform]; !ok {
+			return &kfapis.KfError{
+				Code:    int(kfapis.INTERNAL_ERROR),
+				Message: "Platform OSSM specified but not loaded.",
+			}
+		} else {
+			ossmInstaller := p.(*ossm.OssmInstaller)
+			return ossmInstaller.Apply(kftypesv3.K8S)
+		}
+	}
+
 	if err := kfapp.KfDef.SyncCache(); err != nil {
 		return &kfapis.KfError{
 			Code:    int(kfapis.INTERNAL_ERROR),
@@ -424,6 +440,9 @@ func (kfapp *coordinator) Apply(resources kftypesv3.ResourceEnum) error {
 		return platform()
 	case kftypesv3.K8S:
 		if err := k8s(); err != nil {
+			return err
+		}
+		if err := ossmApply(); err != nil {
 			return err
 		}
 		// TODO(gabrielwen): Need to find a more proper way of injecting plugings.
@@ -483,7 +502,7 @@ func (kfapp *coordinator) Delete(resources kftypesv3.ResourceEnum) error {
 			}
 		} else {
 			ossmInstaller := p.(*ossm.OssmInstaller)
-			return ossmInstaller.CleanupResources()
+			return ossmInstaller.Delete(kftypesv3.K8S)
 		}
 	}
 

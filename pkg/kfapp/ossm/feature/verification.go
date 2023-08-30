@@ -19,9 +19,11 @@ func EnsureCRDIsInstalled(group string, version string, resource string) action 
 			Resource: resource,
 		}
 
-		_, err := f.dynamicClient.Resource(crdGVR).List(context.Background(), metav1.ListOptions{})
+		if _, err := f.dynamicClient.Resource(crdGVR).List(context.Background(), metav1.ListOptions{}); err != nil {
+			return errors.Wrapf(err, "checked for CRD presence {group:%s; version:%s; resource:%s}", group, version, resource)
+		}
 
-		return err
+		return nil
 	}
 }
 

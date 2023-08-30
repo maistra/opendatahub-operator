@@ -68,6 +68,10 @@ func (f *Feature) Apply() error {
 		return multiErr.ErrorOrNil()
 	}
 
+	if err := f.createResourceTracker(); err != nil {
+		return err
+	}
+
 	// create or update resources
 	for _, resource := range f.resources {
 		if err := resource(f); err != nil {
@@ -100,6 +104,12 @@ func (f *Feature) Apply() error {
 }
 
 func (f *Feature) Cleanup() error {
+	if !f.Enabled {
+		log.Info("feature is disabled, skipping.", "name", f.Name)
+
+		return nil
+	}
+
 	var cleanupErrors *multierror.Error
 	for _, cleanupFunc := range f.cleanups {
 		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc(f))

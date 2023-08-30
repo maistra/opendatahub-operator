@@ -126,7 +126,6 @@ func (o *OssmInstaller) enableFeatures() error {
 		).
 		WithData(feature.ClusterDetails, feature.OAuthConfig).
 		Preconditions(
-			feature.EnsureCRDIsInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"),
 			feature.EnsureServiceMeshInstalled,
 		).
 		OnDelete(
@@ -193,6 +192,10 @@ func (o *OssmInstaller) enableFeatures() error {
 			path.Join(rootDir, feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
 		).
 		WithData(feature.ClusterDetails).
+		Preconditions(
+			feature.EnsureCRDIsInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"),
+			feature.EnsureServiceMeshInstalled,
+		).
 		OnDelete(feature.RemoveExtensionProvider).
 		Load(); err != nil {
 		return err

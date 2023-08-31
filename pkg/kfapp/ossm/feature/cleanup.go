@@ -37,7 +37,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 	for i, v := range volumes {
 		volume, ok := v.(map[string]interface{})
 		if !ok {
-			fmt.Println("Unexpected type for volume")
+			log.Info("unexpected type for volume", "type", fmt.Sprintf("%T", volume))
 			continue
 		}
 
@@ -46,7 +46,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 			return err
 		}
 		if !found {
-			fmt.Println("No volumeMount found in the volume")
+			log.Info("no volumeMount found in the volume")
 			continue
 		}
 
@@ -61,11 +61,8 @@ func RemoveTokenVolumes(feature *Feature) error {
 	}
 
 	_, err = feature.dynamicClient.Resource(smcpGVR).Namespace(meshNs).Update(context.Background(), smcp, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func RemoveOAuthClient(feature *Feature) error {
@@ -86,6 +83,7 @@ func RemoveOAuthClient(feature *Feature) error {
 
 	if err := feature.dynamicClient.Resource(gvr).Delete(context.Background(), oauthClientName, metav1.DeleteOptions{}); err != nil {
 		log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
+
 		return err
 	}
 

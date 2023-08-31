@@ -220,6 +220,83 @@ var _ = Describe("Data Science Project Migration", func() {
 
 })
 
+var _ = Describe("Feature enablement", func() {
+
+	var (
+		objectCleaner  *testenv.Cleaner
+		ossmInstaller  *ossm.OssmInstaller
+		ossmPluginSpec *ossmplugin.OssmPluginSpec
+		name           = "test-name"
+		namespace      = "test-namespace"
+	)
+
+	BeforeEach(func() {
+		ossmInstaller = newOssmInstaller(namespace)
+		var err error
+		ossmPluginSpec, err = ossmInstaller.GetPluginSpec()
+		Expect(err).ToNot(HaveOccurred())
+
+		ossmPluginSpec.Mesh.Name = name
+		ossmPluginSpec.Mesh.Namespace = namespace
+
+		objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
+	})
+
+	It("should install control planed when enabled", func() {
+		// given
+		ns := createNamespace(namespace)
+		Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+		defer objectCleaner.DeleteAll(ns)
+
+		ossmPluginSpec.Mesh.Mode = ossmplugin.Managed
+
+		serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
+			For(ossmPluginSpec).
+			UsingConfig(envTest.Config).
+			Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-managed.tmpl"))).
+			EnabledIf(func(f *feature.Feature) bool {
+				return f.Spec.Mesh.Mode == ossmplugin.Managed
+			}).
+			Load()
+
+		Expect(err).ToNot(HaveOccurred())
+
+		// when
+		Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+
+		// then
+		controlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(controlPlane.GetName()).To(Equal(name))
+	})
+
+	It("should not install control plane when disabled", func() {
+		// given
+		ns := createNamespace(namespace)
+		Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+		defer objectCleaner.DeleteAll(ns)
+
+		serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
+			For(ossmPluginSpec).
+			UsingConfig(envTest.Config).
+			Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-managed.tmpl"))).
+			EnabledIf(func(f *feature.Feature) bool {
+				return false
+			}).
+			Load()
+
+		Expect(err).ToNot(HaveOccurred())
+
+		// when
+		Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+
+		// then
+		_, err = getServiceMeshControlPlane(envTest.Config, namespace, name)
+		Expect(errors.IsNotFound(err)).To(BeTrue())
+	})
+
+})
+
 var _ = Describe("Cleanup operations", func() {
 
 	Context("configuring control plane for auth(z)", func() {
@@ -255,7 +332,7 @@ var _ = Describe("Cleanup operations", func() {
 
 			controlPlaneWithSecretVolumes, err := feature.CreateFeature("control-plane-with-secret-volumes").
 				For(ossmPluginSpec).
-				Manifests(inTestTmpDir(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl"))).
+				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl"))).
 				UsingConfig(envTest.Config).
 				Load()
 
@@ -289,7 +366,7 @@ var _ = Describe("Cleanup operations", func() {
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("control-plane-with-external-authz-provider").
 				For(ossmPluginSpec).
-				Manifests(inTestTmpDir(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"))).
+				Manifests(fromTestTmpDir(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"))).
 				UsingConfig(envTest.Config).
 				Load()
 
@@ -456,7 +533,7 @@ func getServiceMeshControlPlane(cfg *rest.Config, namespace, name string) (*unst
 	return smcp, nil
 }
 
-func inTestTmpDir(fileName string) string {
+func fromTestTmpDir(fileName string) string {
 	root, err := findProjectRoot()
 	Expect(err).ToNot(HaveOccurred())
 

@@ -101,7 +101,6 @@ func (o *OssmInstaller) enableFeatures() error {
 			return f.Spec.Mesh.Mode == ossmplugin.Managed
 		}).
 		Preconditions(
-			// TODO here you need to add CRD for testing
 			feature.EnsureCRDIsInstalled("prometheuses.monitoring.coreos.com"),
 			feature.EnsureCRDIsInstalled("servicemeshcontrolplanes.maistra.io"),
 		).

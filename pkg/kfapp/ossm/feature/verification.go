@@ -40,7 +40,7 @@ func EnsureServiceMeshInstalled(feature *Feature) error {
 }
 
 const (
-	interval = 1 * time.Second
+	interval = 5 * time.Second
 	duration = 5 * time.Minute
 )
 

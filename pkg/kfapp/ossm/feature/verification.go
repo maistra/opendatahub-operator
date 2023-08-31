@@ -2,6 +2,7 @@ package feature
 
 import (
 	"context"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -38,35 +39,35 @@ func EnsureServiceMeshInstalled(feature *Feature) error {
 	smcpNs := feature.Spec.Mesh.Namespace
 
 	ready, err := CheckControlPlaneComponentReadiness(feature.dynamicClient, smcp, smcpNs)
-	if err != nil {
-		log.Info("An error occurred while checking Service Mesh Control Plane status - ensure the Service Mesh Control Plane referenced exists.")
+	if err != nil || !ready {
+		log.Error(err, "failed waiting for control plane being ready", "name", smcp, "namespace", smcpNs)
 
-		return err
-	}
-	if !ready {
-		log.Info("The referenced Service Mesh Control Plane is not ready.", "name", smcp, "namespace", smcpNs)
-
-		return errors.New("Service Mesh Control Plane status is not ready")
+		return multierror.Append(err, errors.New("service mesh control plane is not ready")).ErrorOrNil()
 	}
 
 	return nil
 }
 
+const (
+	interval = 1 * time.Second
+	duration = 5 * time.Minute
+)
+
 func WaitForControlPlaneToBeReady(feature *Feature) error {
-	return wait.PollImmediate(1*time.Second, 5*time.Minute, func() (done bool, err error) {
+	return wait.PollImmediate(interval, duration, func() (done bool, err error) {
 		smcp := feature.Spec.Mesh.Name
 		smcpNs := feature.Spec.Mesh.Namespace
 
-		log.Info("polling for control plane to be ready", "name", smcp, "namespace", smcpNs)
+		log.Info("waiting for control plane components to be ready", "name", smcp, "namespace", smcpNs, "duration (s)", duration.Seconds())
 
 		return CheckControlPlaneComponentReadiness(feature.dynamicClient, smcp, smcpNs)
 	})
 }
 
-func CheckControlPlaneComponentReadiness(dynamicClient dynamic.Interface, name, namespace string) (bool, error) {
-	unstructObj, err := dynamicClient.Resource(smcpGVR).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+func CheckControlPlaneComponentReadiness(dynamicClient dynamic.Interface, smcp, smcpNs string) (bool, error) {
+	unstructObj, err := dynamicClient.Resource(smcpGVR).Namespace(smcpNs).Get(context.Background(), smcp, metav1.GetOptions{})
 	if err != nil {
-		log.Info("Failed to find Service Mesh Control Plane")
+		log.Info("Failed to find Service Mesh Control Plane", "name", smcp, "namespace", smcpNs)
 
 		return false, err
 	}

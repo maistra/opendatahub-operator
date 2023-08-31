@@ -3,6 +3,7 @@ package feature
 import (
 	"github.com/opendatahub-io/opendatahub-operator/pkg/kfconfig/ossmplugin"
 	"github.com/pkg/errors"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -51,6 +52,10 @@ func (fb *featureBuilder) UsingConfig(config *rest.Config) *featureBuilder {
 		f.client, err = client.New(config, client.Options{})
 		if err != nil {
 			return errors.WithStack(err)
+		}
+
+		if err := apiextv1.AddToScheme(f.client.Scheme()); err != nil {
+			return err
 		}
 
 		return nil

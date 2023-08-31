@@ -102,8 +102,8 @@ func (o *OssmInstaller) enableFeatures() error {
 		}).
 		Preconditions(
 			// TODO here you need to add CRD for testing
-			feature.EnsureCRDIsInstalled("monitoring.coreos.com", "v1", "prometheuses"),
-			feature.EnsureCRDIsInstalled("maistra.io", "v2", "servicemeshcontrolplanes"),
+			feature.EnsureCRDIsInstalled("prometheuses.monitoring.coreos.com"),
+			feature.EnsureCRDIsInstalled("servicemeshcontrolplanes.maistra.io"),
 		).
 		Postconditions(
 			feature.WaitForControlPlaneToBeReady,
@@ -195,7 +195,7 @@ func (o *OssmInstaller) enableFeatures() error {
 		).
 		WithData(feature.ClusterDetails).
 		Preconditions(
-			feature.EnsureCRDIsInstalled("operator.authorino.kuadrant.io", "v1beta1", "authorinos"),
+			feature.EnsureCRDIsInstalled("authconfigs.authorino.kuadrant.io"),
 			feature.EnsureServiceMeshInstalled,
 		).
 		OnDelete(feature.RemoveExtensionProvider).

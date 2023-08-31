@@ -4,32 +4,23 @@ import (
 	"context"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 )
 
-func EnsureCRDIsInstalled(group string, version string, resource string) action {
+func EnsureCRDIsInstalled(name string) action {
 	return func(f *Feature) error {
-		crdGVR := schema.GroupVersionResource{
-			Group:    group,
-			Version:  version,
-			Resource: resource,
-		}
-
-		if _, err := f.dynamicClient.Resource(crdGVR).List(context.Background(), metav1.ListOptions{}); err != nil {
-			return errors.Wrapf(err, "checked for CRD presence {group:%s; version:%s; resource:%s}", group, version, resource)
-		}
-
-		return nil
+		return f.client.Get(context.Background(), client.ObjectKey{Name: name}, &apiextv1.CustomResourceDefinition{})
 	}
 }
 
 func EnsureServiceMeshInstalled(feature *Feature) error {
-	if err := EnsureCRDIsInstalled("maistra.io", "v2", "servicemeshcontrolplanes")(feature); err != nil {
+	if err := EnsureCRDIsInstalled("servicemeshcontrolplanes.maistra.io")(feature); err != nil {
 		log.Info("Failed to find the pre-requisite Service Mesh Control Plane CRD, please ensure Service Mesh Operator is installed.")
 
 		return err
@@ -67,7 +58,7 @@ func WaitForControlPlaneToBeReady(feature *Feature) error {
 func CheckControlPlaneComponentReadiness(dynamicClient dynamic.Interface, smcp, smcpNs string) (bool, error) {
 	unstructObj, err := dynamicClient.Resource(smcpGVR).Namespace(smcpNs).Get(context.Background(), smcp, metav1.GetOptions{})
 	if err != nil {
-		log.Info("Failed to find Service Mesh Control Plane", "name", smcp, "namespace", smcpNs)
+		log.Info("failed to find Service Mesh Control Plane", "name", smcp, "namespace", smcpNs)
 
 		return false, err
 	}

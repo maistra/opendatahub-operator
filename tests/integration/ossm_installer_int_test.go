@@ -46,15 +46,13 @@ var _ = Describe("CRD presence verification", func() {
 
 	It("should successfully check existing CRD", func() {
 		// given example CRD installed into env from /ossm/test/crd/
-		crdGroup := "ossm.plugins.kubeflow.org"
-		crdVersion := "test-version"
-		crdResource := "test-resources"
+		name := "test-resources.ossm.plugins.kubeflow.org"
 
 		var err error
 		verificationFeature, err = feature.CreateFeature("CRD verification").
 			For(ossmPluginSpec).
 			UsingConfig(envTest.Config).
-			Preconditions(feature.EnsureCRDIsInstalled(crdGroup, crdVersion, crdResource)).
+			Preconditions(feature.EnsureCRDIsInstalled(name)).
 			Load()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -67,15 +65,13 @@ var _ = Describe("CRD presence verification", func() {
 
 	It("should fail to check non-existing CRD", func() {
 		// given
-		crdGroup := "non-existing-group"
-		crdVersion := "non-existing-version"
-		crdResource := "non-existing-resource"
+		name := "non-existing-resource.non-existing-group.io"
 
 		var err error
 		verificationFeature, err = feature.CreateFeature("CRD verification").
 			For(ossmPluginSpec).
 			UsingConfig(envTest.Config).
-			Preconditions(feature.EnsureCRDIsInstalled(crdGroup, crdVersion, crdResource)).
+			Preconditions(feature.EnsureCRDIsInstalled(name)).
 			Load()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -84,7 +80,7 @@ var _ = Describe("CRD presence verification", func() {
 
 		// then
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("server could not find the requested resource"))
+		Expect(err.Error()).To(ContainSubstring("\"non-existing-resource.non-existing-group.io\" not found"))
 	})
 })
 
@@ -419,7 +415,10 @@ func createSMCPInCluster(cfg *rest.Config, smcpObj *unstructured.Unstructured, n
 		"readiness": map[string]interface{}{
 			"components": map[string]interface{}{
 				"pending": []interface{}{},
-				"ready":   []interface{}{},
+				"ready": []interface{}{
+					"istiod",
+					"ingress-gateway",
+				},
 				"unready": []interface{}{},
 			},
 		},

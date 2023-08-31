@@ -404,7 +404,7 @@ func (kfapp *coordinator) Apply(resources kftypesv3.ResourceEnum) error {
 		}
 	}
 
-	ossmApply := func() error {
+	serviceMeshConfig := func() error {
 		if kfapp.KfDef.Spec.Platform != kftypesv3.OSSM {
 			return nil
 		}
@@ -439,10 +439,10 @@ func (kfapp *coordinator) Apply(resources kftypesv3.ResourceEnum) error {
 	case kftypesv3.PLATFORM:
 		return platform()
 	case kftypesv3.K8S:
-		if err := k8s(); err != nil {
+		if err := serviceMeshConfig(); err != nil {
 			return err
 		}
-		if err := ossmApply(); err != nil {
+		if err := k8s(); err != nil {
 			return err
 		}
 		// TODO(gabrielwen): Need to find a more proper way of injecting plugings.
@@ -490,7 +490,7 @@ func (kfapp *coordinator) Delete(resources kftypesv3.ResourceEnum) error {
 		return nil
 	}
 
-	ossmCleanup := func() error {
+	serviceMeshCleanup := func() error {
 		if kfapp.KfDef.Spec.Platform != kftypesv3.OSSM {
 			return nil
 		}
@@ -534,7 +534,7 @@ func (kfapp *coordinator) Delete(resources kftypesv3.ResourceEnum) error {
 		if err := k8s(); err != nil {
 			return err
 		}
-		return ossmCleanup()
+		return serviceMeshCleanup()
 	}
 	return nil
 }

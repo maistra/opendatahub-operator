@@ -229,7 +229,7 @@ func (o *OssmInstaller) Apply(_ kftypesv3.ResourceEnum) error {
 	return applyErrors.ErrorOrNil()
 }
 
-func (o *OssmInstaller) Delete(resources kftypesv3.ResourceEnum) error {
+func (o *OssmInstaller) Delete(_ kftypesv3.ResourceEnum) error {
 	// Plugins invoked within k8s (as a platform) won't be participating in Delete
 	// As we create resources we need to clean them up on deletion of KfDef.
 	// This is achieved by hooking into Delete() chain in coordinator.go

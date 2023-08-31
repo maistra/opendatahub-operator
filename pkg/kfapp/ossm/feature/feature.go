@@ -68,10 +68,6 @@ func (f *Feature) Apply() error {
 		return multiErr.ErrorOrNil()
 	}
 
-	if err := f.createResourceTracker(); err != nil {
-		return err
-	}
-
 	// create or update resources
 	for _, resource := range f.resources {
 		if err := resource(f); err != nil {

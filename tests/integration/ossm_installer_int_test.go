@@ -230,69 +230,99 @@ var _ = Describe("Feature enablement", func() {
 		namespace      = "test-namespace"
 	)
 
-	BeforeEach(func() {
-		ossmInstaller = newOssmInstaller(namespace)
-		var err error
-		ossmPluginSpec, err = ossmInstaller.GetPluginSpec()
-		Expect(err).ToNot(HaveOccurred())
+	Context("installing Service Mesh Control Plane", func() {
 
-		ossmPluginSpec.Mesh.Name = name
-		ossmPluginSpec.Mesh.Namespace = namespace
+		BeforeEach(func() {
+			ossmInstaller = newOssmInstaller(namespace)
+			var err error
+			ossmPluginSpec, err = ossmInstaller.GetPluginSpec()
+			Expect(err).ToNot(HaveOccurred())
 
-		objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
-	})
+			ossmPluginSpec.Mesh.Name = name
+			ossmPluginSpec.Mesh.Namespace = namespace
 
-	It("should install control planed when enabled", func() {
-		// given
-		ns := createNamespace(namespace)
-		Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
-		defer objectCleaner.DeleteAll(ns)
+			objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
+		})
 
-		ossmPluginSpec.Mesh.Mode = ossmplugin.Managed
+		It("should install control planed when enabled", func() {
+			// given
+			ns := createNamespace(namespace)
+			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+			defer objectCleaner.DeleteAll(ns)
 
-		serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
-			For(ossmPluginSpec).
-			UsingConfig(envTest.Config).
-			Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-managed.tmpl"))).
-			EnabledIf(func(f *feature.Feature) bool {
-				return f.Spec.Mesh.Mode == ossmplugin.Managed
-			}).
-			Load()
+			ossmPluginSpec.Mesh.InstallationMode = ossmplugin.Minimal
 
-		Expect(err).ToNot(HaveOccurred())
+			serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
+				For(ossmPluginSpec).
+				UsingConfig(envTest.Config).
+				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-minimal.tmpl"))).
+				EnabledIf(func(f *feature.Feature) bool {
+					return f.Spec.Mesh.InstallationMode == ossmplugin.Minimal
+				}).
+				Load()
 
-		// when
-		Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-		// then
-		controlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(controlPlane.GetName()).To(Equal(name))
-	})
+			// when
+			Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
 
-	It("should not install control plane when disabled", func() {
-		// given
-		ns := createNamespace(namespace)
-		Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
-		defer objectCleaner.DeleteAll(ns)
+			// then
+			controlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(controlPlane.GetName()).To(Equal(name))
+		})
 
-		serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
-			For(ossmPluginSpec).
-			UsingConfig(envTest.Config).
-			Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-managed.tmpl"))).
-			EnabledIf(func(f *feature.Feature) bool {
-				return false
-			}).
-			Load()
+		It("should not install control plane when disabled", func() {
+			// given
+			ns := createNamespace(namespace)
+			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+			defer objectCleaner.DeleteAll(ns)
 
-		Expect(err).ToNot(HaveOccurred())
+			serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
+				For(ossmPluginSpec).
+				UsingConfig(envTest.Config).
+				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-minimal.tmpl"))).
+				EnabledIf(func(f *feature.Feature) bool {
+					return false
+				}).
+				Load()
 
-		// when
-		Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-		// then
-		_, err = getServiceMeshControlPlane(envTest.Config, namespace, name)
-		Expect(errors.IsNotFound(err)).To(BeTrue())
+			// when
+			Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+
+			// then
+			_, err = getServiceMeshControlPlane(envTest.Config, namespace, name)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("should not install control plane by default", func() {
+			// given
+			ns := createNamespace(namespace)
+			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+			defer objectCleaner.DeleteAll(ns)
+
+			Expect(ossmPluginSpec.SetDefaults()).ToNot(HaveOccurred())
+
+			serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
+				For(ossmPluginSpec).
+				UsingConfig(envTest.Config).
+				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-minimal.tmpl"))).
+				EnabledIf(func(f *feature.Feature) bool {
+					return f.Spec.Mesh.InstallationMode != ossmplugin.PreInstalled
+				}).
+				Load()
+
+			Expect(err).ToNot(HaveOccurred())
+
+			// when
+			Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+
+			// then
+			_, err = getServiceMeshControlPlane(envTest.Config, namespace, name)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
 	})
 
 })

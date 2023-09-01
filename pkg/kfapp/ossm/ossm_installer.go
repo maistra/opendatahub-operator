@@ -97,13 +97,12 @@ func (o *OssmInstaller) enableFeatures() error {
 		For(o.PluginSpec).
 		UsingConfig(o.config).
 		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "control-plane-managed.tmpl"),
+			path.Join(rootDir, feature.ControlPlaneDir, "control-plane-minimal.tmpl"),
 		).
 		EnabledIf(func(f *feature.Feature) bool {
-			return f.Spec.Mesh.Mode == ossmplugin.Managed
+			return f.Spec.Mesh.InstallationMode != ossmplugin.PreInstalled
 		}).
 		Preconditions(
-			feature.EnsureCRDIsInstalled("prometheuses.monitoring.coreos.com"),
 			feature.EnsureCRDIsInstalled("servicemeshcontrolplanes.maistra.io"),
 		).
 		Postconditions(

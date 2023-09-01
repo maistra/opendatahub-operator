@@ -1,6 +1,7 @@
 package ossmplugin
 
 import (
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 )
@@ -72,11 +73,11 @@ func (plugin *OssmPluginSpec) IsValid() (bool, string) {
 	return true, ""
 }
 
-func (plugin *OssmPluginSpec) SetDefaults() {
-	setDefaults(plugin)
+func (plugin *OssmPluginSpec) SetDefaults() error {
+	return setDefaults(plugin)
 }
 
-func setDefaults(obj interface{}) {
+func setDefaults(obj interface{}) error {
 	value := reflect.ValueOf(obj).Elem()
 	typ := value.Type()
 
@@ -84,15 +85,26 @@ func setDefaults(obj interface{}) {
 		field := value.Field(i)
 		tag := typ.Field(i).Tag.Get("default")
 
-		if tag != "" && field.CanSet() && isEmptyValue(field) {
-			defaultValue := reflect.ValueOf(tag)
-			field.Set(defaultValue)
+		if field.Kind() == reflect.Struct {
+			if err := setDefaults(field.Addr().Interface()); err != nil {
+				return err
+			}
 		}
 
-		if field.Kind() == reflect.Struct {
-			setDefaults(field.Addr().Interface())
+		if tag != "" && field.IsValid() && field.CanSet() && isEmptyValue(field) {
+			defaultValue := reflect.ValueOf(tag)
+			targetType := field.Type()
+			if defaultValue.Type().ConvertibleTo(targetType) {
+				convertedValue := defaultValue.Convert(targetType)
+				field.Set(convertedValue)
+			} else {
+				return errors.Errorf("unable to convert \"%s\" to %s\n", defaultValue, targetType.Name())
+			}
 		}
+
 	}
+
+	return nil
 }
 
 func isEmptyValue(value reflect.Value) bool {

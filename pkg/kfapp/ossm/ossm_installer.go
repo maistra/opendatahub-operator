@@ -71,7 +71,9 @@ func (o *OssmInstaller) Init(_ kftypesv3.ResourceEnum) error {
 		return internalError(errors.WithStack(err))
 	}
 
-	pluginSpec.SetDefaults()
+	if err := pluginSpec.SetDefaults(); err != nil {
+		return internalError(errors.WithStack(err))
+	}
 
 	if valid, reason := pluginSpec.IsValid(); !valid {
 		return internalError(errors.New(reason))

@@ -247,12 +247,11 @@ func (r *KfDefReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 	}
 
 	// set status of the KfDef resource
-	if err := r.reconcileStatus(instance); err != nil {
-		return ctrl.Result{}, err
+	if reconcileError := r.reconcileStatus(instance); reconcileError != nil {
+		return ctrl.Result{}, reconcileError
 	}
 
-	// If deployment created successfully - don't requeue
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -357,7 +356,20 @@ func (r *KfDefReconciler) watchKubeflowResources(a client.Object) (requests []re
 
 }
 
-var kfdefPredicates = predicate.GenerationChangedPredicate{}
+var kfdefPredicates = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return true
+	},
+	GenericFunc: func(e event.GenericEvent) bool {
+		return true
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return false
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return true
+	},
+}
 
 var ownedResourcePredicates = predicate.Funcs{
 	CreateFunc: func(e event.CreateEvent) bool {

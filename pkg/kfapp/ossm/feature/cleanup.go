@@ -9,19 +9,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+var smcpGVR = schema.GroupVersionResource{
+	Group:    "maistra.io",
+	Version:  "v2",
+	Resource: "servicemeshcontrolplanes",
+}
+
 func RemoveTokenVolumes(feature *Feature) error {
 	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.Spec.AppNamespace)
-
-	gvr := schema.GroupVersionResource{
-		Group:    "maistra.io",
-		Version:  "v2",
-		Resource: "servicemeshcontrolplanes",
-	}
 
 	meshNs := feature.Spec.Mesh.Namespace
 	meshName := feature.Spec.Mesh.Name
 
-	smcp, err := feature.dynamicClient.Resource(gvr).Namespace(meshNs).Get(context.Background(), meshName, metav1.GetOptions{})
+	smcp, err := feature.dynamicClient.Resource(smcpGVR).Namespace(meshNs).Get(context.Background(), meshName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -30,14 +30,14 @@ func RemoveTokenVolumes(feature *Feature) error {
 		return err
 	}
 	if !found {
-		log.Info("no volumes found", "smcp", meshName, "istio-ns", meshNs)
+		log.Info("no volumes found", "feature", feature.Name, "control-plane", meshName, "istio-ns", meshNs)
 		return nil
 	}
 
 	for i, v := range volumes {
 		volume, ok := v.(map[string]interface{})
 		if !ok {
-			fmt.Println("Unexpected type for volume")
+			log.Info("unexpected type for volume", "feature", feature.Name, "type", fmt.Sprintf("%T", volume))
 			continue
 		}
 
@@ -46,7 +46,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 			return err
 		}
 		if !found {
-			fmt.Println("No volumeMount found in the volume")
+			log.Info("no volumeMount found in the volume", "feature", feature.Name)
 			continue
 		}
 
@@ -60,12 +60,9 @@ func RemoveTokenVolumes(feature *Feature) error {
 		}
 	}
 
-	_, err = feature.dynamicClient.Resource(gvr).Namespace(meshNs).Update(context.Background(), smcp, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
+	_, err = feature.dynamicClient.Resource(smcpGVR).Namespace(meshNs).Update(context.Background(), smcp, metav1.UpdateOptions{})
 
-	return nil
+	return err
 }
 
 func RemoveOAuthClient(feature *Feature) error {
@@ -85,7 +82,8 @@ func RemoveOAuthClient(feature *Feature) error {
 	}
 
 	if err := feature.dynamicClient.Resource(gvr).Delete(context.Background(), oauthClientName, metav1.DeleteOptions{}); err != nil {
-		log.Error(err, "failed deleting OAuthClient", "name", oauthClientName)
+		log.Error(err, "failed deleting OAuthClient", "feature", feature.Name, "name", oauthClientName)
+
 		return err
 	}
 
@@ -95,15 +93,9 @@ func RemoveOAuthClient(feature *Feature) error {
 func RemoveExtensionProvider(feature *Feature) error {
 	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.Spec.AppNamespace)
 
-	gvr := schema.GroupVersionResource{
-		Group:    "maistra.io",
-		Version:  "v2",
-		Resource: "servicemeshcontrolplanes",
-	}
-
 	mesh := feature.Spec.Mesh
 
-	smcp, err := feature.dynamicClient.Resource(gvr).
+	smcp, err := feature.dynamicClient.Resource(smcpGVR).
 		Namespace(mesh.Namespace).
 		Get(context.Background(), mesh.Name, metav1.GetOptions{})
 	if err != nil {
@@ -115,7 +107,7 @@ func RemoveExtensionProvider(feature *Feature) error {
 		return err
 	}
 	if !found {
-		log.Info("no extension providers found", "smcp", mesh.Name, "istio-ns", mesh.Namespace)
+		log.Info("no extension providers found", "feature", feature.Name, "control-plane", mesh.Name, "namespace", mesh.Namespace)
 		return nil
 	}
 
@@ -136,7 +128,7 @@ func RemoveExtensionProvider(feature *Feature) error {
 		}
 	}
 
-	_, err = feature.dynamicClient.Resource(gvr).
+	_, err = feature.dynamicClient.Resource(smcpGVR).
 		Namespace(mesh.Namespace).
 		Update(context.Background(), smcp, metav1.UpdateOptions{})
 

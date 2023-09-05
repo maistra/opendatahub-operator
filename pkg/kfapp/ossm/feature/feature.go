@@ -23,8 +23,9 @@ import (
 var log = ctrlLog.Log.WithName("ossm-features")
 
 type Feature struct {
-	Name string
-	Spec *Spec
+	Name    string
+	Spec    *Spec
+	Enabled bool
 
 	clientset     *kubernetes.Clientset
 	dynamicClient dynamic.Interface
@@ -42,6 +43,13 @@ type Feature struct {
 type action func(feature *Feature) error
 
 func (f *Feature) Apply() error {
+
+	if !f.Enabled {
+		log.Info("feature is disabled, skipping.", "feature", f.Name)
+
+		return nil
+	}
+
 	// Verify all precondition and collect errors
 	var multiErr *multierror.Error
 	for _, precondition := range f.preconditions {
@@ -73,19 +81,31 @@ func (f *Feature) Apply() error {
 			return errors.WithStack(err)
 		}
 
-		log.Info("applying manifest", "path", m.targetPath())
+		log.Info("applying manifest", "feature", f.Name, "path", m.targetPath())
 	}
 
 	if err := f.applyManifests(); err != nil {
 		return err
 	}
 
-	// TODO postconditions
+	for _, postcondition := range f.postconditions {
+		multiErr = multierror.Append(multiErr, postcondition(f))
+	}
+
+	if multiErr.ErrorOrNil() != nil {
+		return multiErr.ErrorOrNil()
+	}
 
 	return nil
 }
 
 func (f *Feature) Cleanup() error {
+	if !f.Enabled {
+		log.Info("feature is disabled, skipping.", "feature", f.Name)
+
+		return nil
+	}
+
 	var cleanupErrors *multierror.Error
 	for _, cleanupFunc := range f.cleanups {
 		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc(f))
@@ -150,20 +170,20 @@ func (f *Feature) apply(m manifest) error {
 
 	if m.patch {
 		applier = func(filename string) error {
-			log.Info("patching using manifest", "name", m.name, "path", targetPath)
+			log.Info("patching using manifest", "feature", f.Name, "name", m.name, "path", targetPath)
 
 			return f.patchResourceFromFile(filename)
 		}
 	} else {
 		applier = func(filename string) error {
-			log.Info("applying manifest", "name", m.name, "path", targetPath)
+			log.Info("applying manifest", "feature", f.Name, "name", m.name, "path", targetPath)
 
 			return f.createResourceFromFile(filename)
 		}
 	}
 
 	if err := applier(targetPath); err != nil {
-		log.Error(err, "failed to create resource", "name", m.name, "path", targetPath)
+		log.Error(err, "failed to create resource", "feature", f.Name, "name", m.name, "path", targetPath)
 
 		return err
 	}

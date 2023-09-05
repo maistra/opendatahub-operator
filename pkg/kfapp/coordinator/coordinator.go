@@ -87,6 +87,7 @@ func (coord *coordinator) getPackageManagers(kfdef *kfconfig.KfConfig) *map[stri
 // getPackageManager will return an implementation of kftypesv3.KfApp that matches the packagemanager string
 // It looks for statically compiled-in implementations, otherwise it delegates to
 // kftypesv3.LoadKfApp which will try and dynamically load a .so
+//
 func getPackageManager(kfdef *kfconfig.KfConfig) (kftypesv3.KfApp, error) {
 	return kustomize.GetKfApp(kfdef), nil
 }
@@ -126,9 +127,10 @@ func usageReportWarn(applications []kfconfig.Application) {
 // repoVersionToRepoStruct converts the name of a repo and the old style version
 // into a new go-getter style syntax and a Repo spec
 //
-//	  master
-//		 tag
-//		 pull/<ID>[/head]
+//   master
+//	 tag
+//	 pull/<ID>[/head]
+//
 func repoVersionToUri(repo string, version string) string {
 	// Version can be
 	// --version master
@@ -404,6 +406,22 @@ func (kfapp *coordinator) Apply(resources kftypesv3.ResourceEnum) error {
 		}
 	}
 
+	serviceMeshConfig := func() error {
+		if kfapp.KfDef.Spec.Platform != kftypesv3.OSSM {
+			return nil
+		}
+
+		if p, ok := kfapp.Platforms[kfapp.KfDef.Spec.Platform]; !ok {
+			return &kfapis.KfError{
+				Code:    int(kfapis.INTERNAL_ERROR),
+				Message: "Platform OSSM specified but not loaded.",
+			}
+		} else {
+			ossmInstaller := p.(*ossm.OssmInstaller)
+			return ossmInstaller.Apply(kftypesv3.K8S)
+		}
+	}
+
 	if err := kfapp.KfDef.SyncCache(); err != nil {
 		return &kfapis.KfError{
 			Code:    int(kfapis.INTERNAL_ERROR),
@@ -423,6 +441,9 @@ func (kfapp *coordinator) Apply(resources kftypesv3.ResourceEnum) error {
 	case kftypesv3.PLATFORM:
 		return platform()
 	case kftypesv3.K8S:
+		if err := serviceMeshConfig(); err != nil {
+			return err
+		}
 		if err := k8s(); err != nil {
 			return err
 		}
@@ -471,7 +492,7 @@ func (kfapp *coordinator) Delete(resources kftypesv3.ResourceEnum) error {
 		return nil
 	}
 
-	ossmCleanup := func() error {
+	serviceMeshCleanup := func() error {
 		if kfapp.KfDef.Spec.Platform != kftypesv3.OSSM {
 			return nil
 		}
@@ -483,7 +504,7 @@ func (kfapp *coordinator) Delete(resources kftypesv3.ResourceEnum) error {
 			}
 		} else {
 			ossmInstaller := p.(*ossm.OssmInstaller)
-			return ossmInstaller.CleanupResources()
+			return ossmInstaller.Delete(kftypesv3.K8S)
 		}
 	}
 
@@ -515,7 +536,7 @@ func (kfapp *coordinator) Delete(resources kftypesv3.ResourceEnum) error {
 		if err := k8s(); err != nil {
 			return err
 		}
-		return ossmCleanup()
+		return serviceMeshCleanup()
 	}
 	return nil
 }

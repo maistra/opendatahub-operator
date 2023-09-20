@@ -230,3 +230,8 @@ func (s *ServiceMeshInitializer) Delete() error {
 
 	return cleanupErrors.ErrorOrNil()
 }
+
+// TODO: error handle, check for empty spec?
+func (s *ServiceMeshInitializer) GetPluginSpec() (*v1.ServiceMeshSpec, error) {
+	return &s.DSCInitializationSpec.ServiceMesh, nil
+}

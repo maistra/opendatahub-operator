@@ -134,7 +134,7 @@ func (r *SecretGeneratorReconciler) Reconcile(ctx context.Context, request ctrl.
 			secGenLog.Info("Generating a random value for a secret in a namespace",
 				"secret", generatedSecret.Name, "namespace", generatedSecret.Namespace)
 
-			secret, err := newSecret(foundSecret.GetAnnotations())
+			secret, err := NewSecretFrom(foundSecret.GetAnnotations())
 			if err != nil {
 				secGenLog.Error(err, "error creating secret")
 				return ctrl.Result{}, err

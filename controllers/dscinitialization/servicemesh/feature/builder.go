@@ -21,11 +21,12 @@ func CreateFeature(name string) *featureBuilder {
 	return &featureBuilder{name: name}
 }
 
-func (fb *featureBuilder) For(spec *v1.ServiceMeshSpec) *featureBuilder {
+func (fb *featureBuilder) For(spec *v1.DSCInitializationSpec) *featureBuilder {
 	createSpec := func(f *Feature) error {
 		f.Spec = &Spec{
-			ServiceMeshSpec: spec,
+			ServiceMeshSpec: &spec.ServiceMesh,
 		}
+		f.AppNamespace = spec.ApplicationsNamespace
 
 		return nil
 	}

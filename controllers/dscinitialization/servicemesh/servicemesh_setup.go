@@ -71,7 +71,7 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	serviceMeshSpec := s.ServiceMesh
 
 	if smcpInstallation, err := feature.CreateFeature("control-plane-install-managed").
-		For(&serviceMeshSpec).
+		For(s.DSCInitializationSpec).
 		UsingConfig(s.config).
 		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "control-plane-minimal.tmpl"),
@@ -93,7 +93,7 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	}
 
 	if oauth, err := feature.CreateFeature("control-plane-configure-oauth").
-		For(&serviceMeshSpec).
+		For(s.DSCInitializationSpec).
 		UsingConfig(s.config).
 		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "base"),
@@ -121,7 +121,7 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	}
 
 	if cfMaps, err := feature.CreateFeature("shared-config-maps").
-		For(&serviceMeshSpec).
+		For(s.DSCInitializationSpec).
 		UsingConfig(s.config).
 		WithResources(feature.ConfigMaps).
 		Load(); err != nil {
@@ -131,7 +131,7 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	}
 
 	if serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
-		For(&serviceMeshSpec).
+		For(s.DSCInitializationSpec).
 		UsingConfig(s.config).
 		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "smm.tmpl"),
@@ -145,7 +145,7 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	}
 
 	if dashboard, err := feature.CreateFeature("app-enable-service-mesh-in-dashboard").
-		For(&serviceMeshSpec).
+		For(s.DSCInitializationSpec).
 		UsingConfig(s.config).
 		EnabledIf(func(f *feature.Feature) bool {
 			return true
@@ -166,7 +166,7 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	}
 
 	if dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
-		For(&serviceMeshSpec).
+		For(s.DSCInitializationSpec).
 		UsingConfig(s.config).
 		WithResources(feature.MigratedDataScienceProjects).
 		Load(); err != nil {
@@ -176,7 +176,7 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	}
 
 	if extAuthz, err := feature.CreateFeature("control-plane-setup-external-authorization").
-		For(&serviceMeshSpec).
+		For(s.DSCInitializationSpec).
 		UsingConfig(s.config).
 		Manifests(
 			path.Join(rootDir, feature.AuthDir, "auth-smm.tmpl"),

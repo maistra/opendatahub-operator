@@ -1,13 +1,12 @@
-package service_mesh_test
+package servicemesh_test
 
 import (
 	"context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	dscv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
-	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization/servicemesh"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization/servicemesh/feature"
-	"github.com/opendatahub-io/opendatahub-operator/v2/tests/integration/service-mesh/testenv"
+	"github.com/opendatahub-io/opendatahub-operator/v2/tests/integration/servicemesh/testenv"
 	"io"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,11 +43,10 @@ var _ = Describe("preconditions", func() {
 			testFeatureName := "test-ns-creation"
 			namespace = testenv.GenerateNamespaceName(testFeatureName)
 
-			serviceMeshInitializer := newServiceMeshInitializer(namespace)
-			serviceMeshSpec, err := serviceMeshInitializer.GetPluginSpec()
-			Expect(err).ToNot(HaveOccurred())
+			dsciSpec := newDSCInitializationSpec(namespace)
+			var err error
 			testFeature, err = feature.CreateFeature(testFeatureName).
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				Load()
 			Expect(err).ToNot(HaveOccurred())
@@ -85,16 +83,12 @@ var _ = Describe("preconditions", func() {
 	Context("ensuring custom resource definitions are installed", func() {
 
 		var (
-			serviceMeshInitializer *servicemesh.ServiceMeshInitializer
-			serviceMeshSpec        *dscv1.ServiceMeshSpec
-			verificationFeature    *feature.Feature
+			dsciSpec            *dscv1.DSCInitializationSpec
+			verificationFeature *feature.Feature
 		)
 
 		BeforeEach(func() {
-			serviceMeshInitializer = newServiceMeshInitializer("default")
-			var err error
-			serviceMeshSpec, err = serviceMeshInitializer.GetPluginSpec()
-			Expect(err).ToNot(HaveOccurred())
+			dsciSpec = newDSCInitializationSpec("default")
 		})
 
 		It("should successfully check for existing CRD", func() {
@@ -103,7 +97,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				Preconditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -122,7 +116,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				Preconditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -142,25 +136,24 @@ var _ = Describe("preconditions", func() {
 var _ = Describe("Ensuring service mesh is set up correctly", func() {
 
 	var (
-		objectCleaner          *testenv.Cleaner
-		serviceMeshInitializer *servicemesh.ServiceMeshInitializer
-		serviceMeshSpec        *dscv1.ServiceMeshSpec
-		serviceMeshCheck       *feature.Feature
-		name                   = "test-name"
-		namespace              = "test-namespace"
+		objectCleaner    *testenv.Cleaner
+		dsciSpec         *dscv1.DSCInitializationSpec
+		serviceMeshSpec  *dscv1.ServiceMeshSpec
+		serviceMeshCheck *feature.Feature
+		name             = "test-name"
+		namespace        = "test-namespace"
 	)
 
 	BeforeEach(func() {
-		serviceMeshInitializer = newServiceMeshInitializer(namespace)
+		dsciSpec = newDSCInitializationSpec(namespace)
 		var err error
-		serviceMeshSpec, err = serviceMeshInitializer.GetPluginSpec()
-		Expect(err).ToNot(HaveOccurred())
+		serviceMeshSpec = &dsciSpec.ServiceMesh
 
 		serviceMeshSpec.Mesh.Name = name
 		serviceMeshSpec.Mesh.Namespace = namespace
 
 		serviceMeshCheck, err = feature.CreateFeature("datascience-project-migration").
-			For(serviceMeshSpec).
+			For(dsciSpec).
 			UsingConfig(envTest.Config).
 			Preconditions(feature.EnsureServiceMeshInstalled).Load()
 
@@ -192,23 +185,19 @@ var _ = Describe("Ensuring service mesh is set up correctly", func() {
 var _ = Describe("Data Science Project Migration", func() {
 
 	var (
-		objectCleaner          *testenv.Cleaner
-		serviceMeshInitializer *servicemesh.ServiceMeshInitializer
-		serviceMeshSpec        *dscv1.ServiceMeshSpec
-		migrationFeature       *feature.Feature
+		objectCleaner    *testenv.Cleaner
+		dsciSpec         *dscv1.DSCInitializationSpec
+		migrationFeature *feature.Feature
 	)
 
 	BeforeEach(func() {
 		objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
-		serviceMeshInitializer = newServiceMeshInitializer("default")
+		dsciSpec = newDSCInitializationSpec("default")
 
 		var err error
-		serviceMeshSpec, err = serviceMeshInitializer.GetPluginSpec()
-		Expect(err).ToNot(HaveOccurred())
-
 		migrationFeature, err = feature.CreateFeature("datascience-project-migration").
-			For(serviceMeshSpec).
+			For(dsciSpec).
 			UsingConfig(envTest.Config).
 			WithResources(feature.MigratedDataScienceProjects).Load()
 
@@ -278,20 +267,18 @@ var _ = Describe("Data Science Project Migration", func() {
 var _ = Describe("Feature enablement", func() {
 
 	var (
-		objectCleaner          *testenv.Cleaner
-		serviceMeshInitializer *servicemesh.ServiceMeshInitializer
-		serviceMeshSpec        *dscv1.ServiceMeshSpec
-		name                   = "test-name"
-		namespace              = "test-namespace"
+		objectCleaner   *testenv.Cleaner
+		dsciSpec        *dscv1.DSCInitializationSpec
+		serviceMeshSpec *dscv1.ServiceMeshSpec
+		name            = "test-name"
+		namespace       = "test-namespace"
 	)
 
 	Context("installing Service Mesh Control Plane", func() {
 
 		BeforeEach(func() {
-			serviceMeshInitializer = newServiceMeshInitializer(namespace)
-			var err error
-			serviceMeshSpec, err = serviceMeshInitializer.GetPluginSpec()
-			Expect(err).ToNot(HaveOccurred())
+			dsciSpec = newDSCInitializationSpec(namespace)
+			serviceMeshSpec = &dsciSpec.ServiceMesh
 
 			serviceMeshSpec.Mesh.Name = name
 			serviceMeshSpec.Mesh.Namespace = namespace
@@ -308,7 +295,7 @@ var _ = Describe("Feature enablement", func() {
 			serviceMeshSpec.Mesh.InstallationMode = dscv1.Minimal
 
 			serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-minimal.tmpl"))).
 				EnabledIf(func(f *feature.Feature) bool {
@@ -334,7 +321,7 @@ var _ = Describe("Feature enablement", func() {
 			defer objectCleaner.DeleteAll(ns)
 
 			serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-minimal.tmpl"))).
 				EnabledIf(func(f *feature.Feature) bool {
@@ -361,7 +348,7 @@ var _ = Describe("Feature enablement", func() {
 			Expect(serviceMeshSpec.SetDefaults()).ToNot(HaveOccurred())
 
 			serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "control-plane-minimal.tmpl"))).
 				EnabledIf(func(f *feature.Feature) bool {
@@ -387,21 +374,19 @@ var _ = Describe("Cleanup operations", func() {
 	Context("configuring control plane for auth(z)", func() {
 
 		var (
-			objectCleaner          *testenv.Cleaner
-			serviceMeshInitializer *servicemesh.ServiceMeshInitializer
-			serviceMeshSpec        *dscv1.ServiceMeshSpec
-			namespace              = "test"
-			name                   = "minimal"
+			objectCleaner   *testenv.Cleaner
+			dsciSpec        *dscv1.DSCInitializationSpec
+			serviceMeshSpec *dscv1.ServiceMeshSpec
+			namespace       = "test"
+			name            = "minimal"
 		)
 
 		BeforeEach(func() {
 			objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
-			serviceMeshInitializer = newServiceMeshInitializer(namespace)
+			dsciSpec = newDSCInitializationSpec(namespace)
 
-			var err error
-			serviceMeshSpec, err = serviceMeshInitializer.GetPluginSpec()
-			Expect(err).ToNot(HaveOccurred())
+			serviceMeshSpec = &dsciSpec.ServiceMesh
 
 			serviceMeshSpec.Mesh.Name = name
 			serviceMeshSpec.Mesh.Namespace = namespace
@@ -416,7 +401,7 @@ var _ = Describe("Cleanup operations", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithSecretVolumes, err := feature.CreateFeature("control-plane-with-secret-volumes").
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl"))).
 				UsingConfig(envTest.Config).
 				Load()
@@ -450,7 +435,7 @@ var _ = Describe("Cleanup operations", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("control-plane-with-external-authz-provider").
-				For(serviceMeshSpec).
+				For(dsciSpec).
 				Manifests(fromTestTmpDir(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"))).
 				UsingConfig(envTest.Config).
 				Load()
@@ -536,10 +521,10 @@ func findMigratedNamespaces() []string {
 	return ns
 }
 
-func newServiceMeshInitializer(ns string) *servicemesh.ServiceMeshInitializer {
+func newDSCInitializationSpec(ns string) *dscv1.DSCInitializationSpec {
 	spec := dscv1.DSCInitializationSpec{}
 	spec.ApplicationsNamespace = ns
-	return servicemesh.NewServiceMeshInstaller(envTest.Config, &spec)
+	return &spec
 }
 
 // createSMCPInCluster uses dynamic client to create a dummy SMCP resource for testing
@@ -630,7 +615,7 @@ func fromTestTmpDir(fileName string) string {
 		Fail(err.Error())
 	}
 
-	src := path.Join(root, "pkg/kfapp/ossm", fileName) // TODO: check/fix path
+	src := path.Join(root, "controllers/dscinitialization/servicemesh", fileName) // TODO: check/fix path
 	dest := path.Join(tmpDir, fileName)
 	if err := copyFile(src, dest); err != nil {
 		Fail(err.Error())

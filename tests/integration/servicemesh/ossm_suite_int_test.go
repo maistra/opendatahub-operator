@@ -1,4 +1,4 @@
-package service_mesh_test
+package servicemesh_test
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -59,7 +59,7 @@ var _ = BeforeSuite(func() {
 			Paths: []string{
 				filepath.Join(projectDir, "config", "crd", "bases"),
 				filepath.Join(projectDir, "config", "crd", "dashboard-crds"),
-				filepath.Join(projectDir, "tests", "integration", "crd"),
+				filepath.Join(projectDir, "tests", "integration", "servicemesh", "crd"),
 			},
 			ErrorIfPathMissing: true,
 			CleanUpAfterUse:    false,

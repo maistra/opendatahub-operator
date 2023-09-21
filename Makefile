@@ -133,6 +133,11 @@ test: manifests generate fmt vet envtest ## Run tests.
 # E2E tests additional flags
 E2E_TEST_FLAGS = "--skip-deletion=false" -timeout 15m # See README.md, default go test timeout 10m
 
+.PHONY: test-ossm
+test-ossm: manifests generate fmt vet envtest ## Run tests.
+	go test ./controllers/dscinitialization/servicemesh/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./tests/integration/servicemesh/... -coverprofile cover.out
+
 .PHONY: get-manifests
 get-manifests: ## Fetch components manifests from remote git repo
 	./get_all_manifests.sh

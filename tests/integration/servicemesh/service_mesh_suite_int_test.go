@@ -31,7 +31,7 @@ var (
 
 var testScheme = runtime.NewScheme()
 
-func TestOssmInstallerIntegration(t *testing.T) {
+func TestServiceMeshSetupIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Openshift Service Mesh infra setup integration")
 }

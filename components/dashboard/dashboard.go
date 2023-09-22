@@ -39,6 +39,7 @@ var imageParamMap = map[string]string{
 
 type Dashboard struct {
 	components.Component `json:""`
+	img                  string
 }
 
 func (d *Dashboard) OverrideManifests(platform string) error {
@@ -183,6 +184,10 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 			}
 		}
 	}
+
+	/*if dscispec.ServiceMesh.IsEnabled() != nil {
+		// TODO swap to service-mesh overlay if enabled && path exists
+	}*/
 
 	// Deploy odh-dashboard manifests
 	if platform == deploy.OpenDataHub || platform == "" {

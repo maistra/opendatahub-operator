@@ -8,12 +8,6 @@ rules:
 - apiGroups:
   - '*'
   resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - '*'
-  resources:
   - customresourcedefinitions
   verbs:
   - get

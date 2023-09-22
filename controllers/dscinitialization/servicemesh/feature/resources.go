@@ -44,7 +44,7 @@ func SelfSignedCertificate(feature *Feature) error {
 
 func EnvoyOAuthSecrets(feature *Feature) error {
 	objectMeta := metav1.ObjectMeta{
-		Name:      feature.AppNamespace + "-oauth2-tokens",
+		Name:      feature.Spec.AppNamespace + "-oauth2-tokens",
 		Namespace: feature.Spec.Mesh.Namespace,
 		OwnerReferences: []metav1.OwnerReference{
 			feature.OwnerReference(),
@@ -97,7 +97,7 @@ func ServiceMeshEnabledInDashboard(feature *Feature) error {
 
 	configs, err := feature.dynamicClient.
 		Resource(gvr).
-		Namespace(feature.AppNamespace).
+		Namespace(feature.Spec.AppNamespace).
 		List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -121,7 +121,7 @@ func ServiceMeshEnabledInDashboard(feature *Feature) error {
 	dashboardConfig["disableServiceMesh"] = false
 
 	if _, err := feature.dynamicClient.Resource(gvr).
-		Namespace(feature.AppNamespace).
+		Namespace(feature.Spec.AppNamespace).
 		Update(context.Background(), &config, metav1.UpdateOptions{}); err != nil {
 		log.Error(err, "Failed to update odhdashboardconfig")
 

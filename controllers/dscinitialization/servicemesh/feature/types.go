@@ -7,9 +7,10 @@ import (
 
 type Spec struct {
 	*v1.ServiceMeshSpec
-	OAuth   OAuth
-	Domain  string
-	Tracker *v1.ServiceMeshResourceTracker
+	OAuth        OAuth
+	AppNamespace string
+	Domain       string
+	Tracker      *v1.ServiceMeshResourceTracker
 }
 
 type OAuth struct {

@@ -23,8 +23,7 @@ import (
 var log = ctrlLog.Log.WithName("service-mesh-features")
 
 type Feature struct {
-	Name,
-	AppNamespace string
+	Name    string
 	Spec    *Spec
 	Enabled bool
 
@@ -130,7 +129,7 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfgMapName,
-			Namespace: f.AppNamespace,
+			Namespace: f.Spec.AppNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				f.OwnerReference(),
 			},
@@ -207,7 +206,7 @@ func (f *Feature) createResourceTracker() error {
 			Kind:       "ServiceMeshResourceTracker",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: f.AppNamespace + "-" + convertToRFC1123Subdomain(f.Name),
+			Name: f.Spec.AppNamespace + "-" + convertToRFC1123Subdomain(f.Name),
 		},
 	}
 

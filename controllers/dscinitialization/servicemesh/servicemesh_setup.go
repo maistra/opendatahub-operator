@@ -38,7 +38,6 @@ func (s *ServiceMeshInitializer) Init() error {
 
 	serviceMeshSpec := s.DSCInitializationSpec.ServiceMesh
 
-	// TODO rework internal errors
 	if err := serviceMeshSpec.SetDefaults(); err != nil {
 		return errors.WithStack(err)
 	}

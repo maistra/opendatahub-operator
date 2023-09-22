@@ -16,7 +16,7 @@ var smcpGVR = schema.GroupVersionResource{
 }
 
 func RemoveTokenVolumes(feature *Feature) error {
-	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.AppNamespace)
+	tokenVolume := fmt.Sprintf("%s-oauth2-tokens", feature.Spec.AppNamespace)
 
 	meshNs := feature.Spec.Mesh.Namespace
 	meshName := feature.Spec.Mesh.Name
@@ -66,7 +66,7 @@ func RemoveTokenVolumes(feature *Feature) error {
 }
 
 func RemoveOAuthClient(feature *Feature) error {
-	oauthClientName := fmt.Sprintf("%s-oauth2-client", feature.AppNamespace)
+	oauthClientName := fmt.Sprintf("%s-oauth2-client", feature.Spec.AppNamespace)
 	gvr := schema.GroupVersionResource{
 		Group:    "oauth.openshift.io",
 		Version:  "v1",
@@ -91,7 +91,7 @@ func RemoveOAuthClient(feature *Feature) error {
 }
 
 func RemoveExtensionProvider(feature *Feature) error {
-	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.AppNamespace)
+	ossmAuthzProvider := fmt.Sprintf("%s-odh-auth-provider", feature.Spec.AppNamespace)
 
 	mesh := feature.Spec.Mesh
 

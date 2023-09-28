@@ -133,8 +133,7 @@ func (k *Kserve) ReconcileComponent(cli client.Client, owner metav1.Object, dsci
 
 	// For odh-model-controller
 	if enabled {
-		err := cluster.UpdatePodSecurityRolebinding(cli, []string{"odh-model-controller"}, dscispec.ApplicationsNamespace)
-		if err != nil {
+		if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "odh-model-controller"); err != nil {
 			return err
 		}
 		// Update image parameters for odh-maodel-controller

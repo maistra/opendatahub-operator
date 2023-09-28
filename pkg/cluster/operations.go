@@ -37,16 +37,16 @@ func CreateNamespace(cli client.Client, namespace string) error {
 
 // UpdatePodSecurityRolebinding update default rolebinding which is created in applications namespace by manifests
 // being used by different components.
-func UpdatePodSecurityRolebinding(cli client.Client, serviceAccountsList []string, namespace string) error {
+func UpdatePodSecurityRolebinding(cli client.Client, namespace string, serviceAccounts ...string) error {
 	foundRoleBinding := &authv1.RoleBinding{}
 	err := cli.Get(context.TODO(), client.ObjectKey{Name: namespace, Namespace: namespace}, foundRoleBinding)
 	if err != nil {
 		return err
 	}
 
-	for _, sa := range serviceAccountsList {
+	for _, sa := range serviceAccounts {
 		// Append serviceAccount if not added already
-		if !subjectExistInRoleBinding(foundRoleBinding.Subjects, sa, namespace) {
+		if !subjectExistInRoleBinding(namespace, sa, foundRoleBinding.Subjects...) {
 			foundRoleBinding.Subjects = append(foundRoleBinding.Subjects, authv1.Subject{
 				Kind:      authv1.ServiceAccountKind,
 				Name:      sa,
@@ -59,12 +59,13 @@ func UpdatePodSecurityRolebinding(cli client.Client, serviceAccountsList []strin
 
 // Internal function used by UpdatePodSecurityRolebinding()
 // Return whether Rolebinding matching service account and namespace exists or not
-func subjectExistInRoleBinding(subjectList []authv1.Subject, serviceAccountName, namespace string) bool {
-	for _, subject := range subjectList {
+func subjectExistInRoleBinding(namespace, serviceAccountName string, subjects ...authv1.Subject) bool {
+	for _, subject := range subjects {
 		if subject.Name == serviceAccountName && subject.Namespace == namespace {
 			return true
 		}
 	}
+
 	return false
 }
 

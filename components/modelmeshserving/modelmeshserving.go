@@ -78,8 +78,7 @@ func (m *ModelMeshServing) ReconcileComponent(cli client.Client, owner metav1.Ob
 			return err
 		}
 
-		err := cluster.UpdatePodSecurityRolebinding(cli, []string{"modelmesh", "modelmesh-controller", "odh-model-controller", "odh-prometheus-operator", "prometheus-custom"}, dscispec.ApplicationsNamespace)
-		if err != nil {
+		if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "modelmesh", "modelmesh-controller", "odh-model-controller", "odh-prometheus-operator", "prometheus-custom"); err != nil {
 			return err
 		}
 		// Update image parameters

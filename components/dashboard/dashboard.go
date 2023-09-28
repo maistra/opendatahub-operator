@@ -102,7 +102,7 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 		}
 
 		if platform == deploy.OpenDataHub || platform == "" {
-			if err := cluster.UpdatePodSecurityRolebinding(cli, []string{"odh-dashboard"}, dscispec.ApplicationsNamespace); err != nil {
+			if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "odh-dashboard"); err != nil {
 				return err
 			}
 
@@ -118,7 +118,7 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 
 		}
 		if platform == deploy.SelfManagedRhods || platform == deploy.ManagedRhods {
-			if err := cluster.UpdatePodSecurityRolebinding(cli, []string{"rhods-dashboard"}, dscispec.ApplicationsNamespace); err != nil {
+			if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "rhods-dashboard"); err != nil {
 				return err
 			}
 

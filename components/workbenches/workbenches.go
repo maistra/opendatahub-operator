@@ -124,7 +124,7 @@ func (w *Workbenches) ReconcileComponent(cli client.Client, owner metav1.Object,
 				return err
 			}
 		}
-		if err := cluster.UpdatePodSecurityRolebinding(cli, []string{"notebook-controller-service-account"}, dscispec.ApplicationsNamespace); err != nil {
+		if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "notebook-controller-service-account"); err != nil {
 			return err
 		}
 	}

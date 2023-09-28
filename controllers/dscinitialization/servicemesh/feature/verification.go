@@ -73,7 +73,7 @@ const (
 func WaitForPodsToBeReady(namespace string) action {
 	return func(feature *Feature) error {
 		return wait.Poll(interval, duration, func() (done bool, err error) {
-			log.Info("waiting for control plane pods to become ready", "feature", feature.Name, "namespace", namespace, "duration (s)", duration.Seconds())
+			log.Info("waiting for pods to become ready", "feature", feature.Name, "namespace", namespace, "duration (s)", duration.Seconds())
 			podList, err := feature.clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				return false, err

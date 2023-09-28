@@ -12,7 +12,7 @@ import (
 const (
 	ControlPlaneDir = "templates/control-plane"
 	AuthDir         = "templates/authorino"
-	BaseOutputDir   = "/tmp/ossm-installer/"
+	BaseOutputDir   = "/tmp/service-mesh-manifests/"
 )
 
 type manifest struct {

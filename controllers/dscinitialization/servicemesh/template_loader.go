@@ -14,7 +14,7 @@ var embeddedFiles embed.FS
 // to store the files. This is because embedded files are read only.
 // copyEmbeddedFS ensures that files embedded using go:embed are populated
 // to dest directory
-func copyEmbeddedFiles(src, dest string) error {
+func CopyEmbeddedFiles(src, dest string) error {
 	return fs.WalkDir(embeddedFiles, src, func(path string, dir fs.DirEntry, err error) error {
 		if err != nil {
 			return err

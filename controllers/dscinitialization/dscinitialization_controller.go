@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization/servicemesh"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"path/filepath"
 
@@ -57,6 +58,7 @@ type DSCInitializationReconciler struct {
 // +kubebuilder:rbac:groups="dscinitialization.opendatahub.io",resources=dscinitializations/status,verbs=get;update;patch;delete
 // +kubebuilder:rbac:groups="dscinitialization.opendatahub.io",resources=dscinitializations/finalizers,verbs=get;update;patch;delete
 // +kubebuilder:rbac:groups="dscinitialization.opendatahub.io",resources=dscinitializations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="dscinitialization.opendatahub.io",resources=servicemeshresourcetrackers,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile contains controller logic specific to DSCInitialization instance updates
 func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -182,6 +184,23 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			// TODO: ODH specific monitoring logic
 			r.Log.Info("Monitoring enabled, won't apply changes", "cluster", "ODH Mode")
 		}
+	}
+
+	if platform == deploy.OpenDataHub && instance.Spec.ServiceMesh.ManagementState == operatorv1.Managed {
+
+		serviceMeshInitializer, err := servicemesh.NewServiceMeshInitializer(&instance.Spec)
+		if err != nil {
+			r.Log.Error(err, "failed creating service mesh initializer")
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed creating service mesh initializer")
+			return reconcile.Result{}, err
+		}
+
+		if err := serviceMeshInitializer.Configure(); err != nil {
+			r.Log.Error(err, "failed configuring service mesh resources")
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed configuring service mesh resources")
+			return reconcile.Result{}, err
+		}
+
 	}
 
 	// Finish reconciling

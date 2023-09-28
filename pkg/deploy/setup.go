@@ -20,6 +20,7 @@ const (
 	OpenDataHub Platform = "Open Data Hub Operator"
 )
 
+// TODO rework to have "" as Unknown
 type Platform string
 
 // isSelfManaged checks presence of ClusterServiceVersions:

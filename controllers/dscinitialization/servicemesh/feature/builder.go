@@ -7,6 +7,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,7 +39,13 @@ func (fb *featureBuilder) For(spec *v1.DSCInitializationSpec) *featureBuilder {
 }
 
 func (fb *featureBuilder) UsingConfig(config *rest.Config) *featureBuilder {
-	fb.builders = append(fb.builders, func(f *Feature) error {
+	fb.builders = append(fb.builders, createClients(config))
+
+	return fb
+}
+
+func createClients(config *rest.Config) partialBuilder {
+	return func(f *Feature) error {
 		var err error
 		f.clientset, err = kubernetes.NewForConfig(config)
 		if err != nil {
@@ -60,9 +67,7 @@ func (fb *featureBuilder) UsingConfig(config *rest.Config) *featureBuilder {
 		}
 
 		return nil
-	})
-
-	return fb
+	}
 }
 
 func (fb *featureBuilder) Manifests(paths ...string) *featureBuilder {
@@ -153,6 +158,30 @@ func (fb *featureBuilder) Load() (*Feature, error) {
 
 	for i := range fb.builders {
 		if err := fb.builders[i](feature); err != nil {
+			return nil, err
+		}
+	}
+
+	// UsingConfig builder wasn't called while constructing this feature.
+	// Get default settings and create needed clients.
+	if feature.client == nil {
+		config, err := rest.InClusterConfig()
+		if errors.Is(err, rest.ErrNotInCluster) {
+			// rollback to local kubeconfig - this can be helpful when running the process locally i.e. while debugging
+			kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+				&clientcmd.ClientConfigLoadingRules{ExplicitPath: clientcmd.RecommendedHomeFile},
+				&clientcmd.ConfigOverrides{},
+			)
+
+			config, err = kubeconfig.ClientConfig()
+			if err != nil {
+				return nil, err
+			}
+		} else if err != nil {
+			return nil, err
+		}
+
+		if err := createClients(config)(feature); err != nil {
 			return nil, err
 		}
 	}

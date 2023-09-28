@@ -50,7 +50,6 @@ var _ = Describe("preconditions", func() {
 				UsingConfig(envTest.Config).
 				Load()
 			Expect(err).ToNot(HaveOccurred())
-
 		})
 
 		It("should create namespace if it does not exist", func() {
@@ -93,7 +92,7 @@ var _ = Describe("preconditions", func() {
 
 		It("should successfully check for existing CRD", func() {
 			// given example CRD installed into env from /ossm/test/crd/
-			name := "test-resources.ossm.plugins.kubeflow.org"
+			name := "test-resources.openshift.io"
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
@@ -162,7 +161,7 @@ var _ = Describe("Ensuring service mesh is set up correctly", func() {
 		objectCleaner = testenv.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 	})
 
-	It("should find installed SMCP", func() {
+	It("should find installed Service Mesh Control Plane", func() {
 		ns := createNamespace(namespace)
 		Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
 		defer objectCleaner.DeleteAll(ns)
@@ -176,8 +175,8 @@ var _ = Describe("Ensuring service mesh is set up correctly", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should fail to find SMCP if not present", func() {
-		Expect(serviceMeshCheck.Apply()).To(HaveOccurred())
+	It("should fail to find Service Mesh Control Plane if not present", func() {
+		Expect(serviceMeshCheck.Apply()).ToNot(Succeed())
 	})
 
 })
@@ -214,7 +213,7 @@ var _ = Describe("Data Science Project Migration", func() {
 		defer objectCleaner.DeleteAll(dataScienceNs, regularNs)
 
 		// when
-		Expect(migrationFeature.Apply()).ToNot(HaveOccurred())
+		Expect(migrationFeature.Apply()).To(Succeed())
 
 		// then
 		Eventually(findMigratedNamespaces, timeout, interval).Should(
@@ -232,7 +231,7 @@ var _ = Describe("Data Science Project Migration", func() {
 		defer objectCleaner.DeleteAll(regularNs)
 
 		// when
-		Expect(migrationFeature.Apply()).ToNot(HaveOccurred())
+		Expect(migrationFeature.Apply()).To(Succeed())
 
 		// then
 		Consistently(findMigratedNamespaces, timeout, interval).Should(BeEmpty()) // we can't wait forever, but this should be good enough
@@ -251,7 +250,7 @@ var _ = Describe("Data Science Project Migration", func() {
 		defer objectCleaner.DeleteAll(dataScienceNs01, dataScienceNs02, dataScienceNs03, regularNs)
 
 		// when
-		Expect(migrationFeature.Apply()).ToNot(HaveOccurred())
+		Expect(migrationFeature.Apply()).To(Succeed())
 
 		// then
 		Eventually(findMigratedNamespaces, timeout, interval).Should(
@@ -306,7 +305,7 @@ var _ = Describe("Feature enablement", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// when
-			Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+			Expect(serviceMeshInstallation.Apply()).To(Succeed())
 
 			// then
 			controlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
@@ -332,7 +331,7 @@ var _ = Describe("Feature enablement", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// when
-			Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+			Expect(serviceMeshInstallation.Apply()).To(Succeed())
 
 			// then
 			_, err = getServiceMeshControlPlane(envTest.Config, namespace, name)
@@ -345,7 +344,7 @@ var _ = Describe("Feature enablement", func() {
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
 			defer objectCleaner.DeleteAll(ns)
 
-			Expect(serviceMeshSpec.SetDefaults()).ToNot(HaveOccurred())
+			Expect(serviceMeshSpec.SetDefaults()).To(Succeed())
 
 			serviceMeshInstallation, err := feature.CreateFeature("control-plane-installation").
 				For(dsciSpec).
@@ -359,7 +358,7 @@ var _ = Describe("Feature enablement", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// when
-			Expect(serviceMeshInstallation.Apply()).ToNot(HaveOccurred())
+			Expect(serviceMeshInstallation.Apply()).To(Succeed())
 
 			// then
 			_, err = getServiceMeshControlPlane(envTest.Config, namespace, name)
@@ -409,7 +408,7 @@ var _ = Describe("Cleanup operations", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// when
-			Expect(controlPlaneWithSecretVolumes.Apply()).ToNot(HaveOccurred())
+			Expect(controlPlaneWithSecretVolumes.Apply()).To(Succeed())
 			// Testing removal function on its own relying on feature setup
 			err = feature.RemoveTokenVolumes(controlPlaneWithSecretVolumes)
 
@@ -444,7 +443,7 @@ var _ = Describe("Cleanup operations", func() {
 
 			// when
 			By("verifying extension provider has been added after applying feature", func() {
-				Expect(controlPlaneWithExtAuthzProvider.Apply()).ToNot(HaveOccurred())
+				Expect(controlPlaneWithExtAuthzProvider.Apply()).To(Succeed())
 				serviceMeshControlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -487,8 +486,7 @@ func createServiceMeshControlPlane(name, namespace string) {
 			"spec": map[string]interface{}{},
 		},
 	}
-	createErr := createSMCPInCluster(envTest.Config, serviceMeshControlPlane, namespace)
-	Expect(createErr).ToNot(HaveOccurred())
+	Expect(createSMCPInCluster(envTest.Config, serviceMeshControlPlane, namespace)).To(Succeed())
 }
 
 func createDataScienceProject(name string) *v1.Namespace {

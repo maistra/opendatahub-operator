@@ -12,6 +12,7 @@ import (
 
 	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/common"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 
@@ -95,13 +96,12 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 	enabled := d.GetManagementState() == operatorv1.Managed
 	if enabled {
 		// Download manifests and update paths
-		if err = d.OverrideManifests(string(platform)); err != nil {
+		if err := d.OverrideManifests(string(platform)); err != nil {
 			return err
 		}
 
 		if platform == deploy.OpenDataHub || platform == "" {
-			err := common.UpdatePodSecurityRolebinding(cli, []string{"odh-dashboard"}, dscispec.ApplicationsNamespace)
-			if err != nil {
+			if err := cluster.UpdatePodSecurityRolebinding(cli, []string{"odh-dashboard"}, dscispec.ApplicationsNamespace); err != nil {
 				return err
 			}
 
@@ -116,8 +116,7 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 			}
 		}
 		if platform == deploy.SelfManagedRhods || platform == deploy.ManagedRhods {
-			err := common.UpdatePodSecurityRolebinding(cli, []string{"rhods-dashboard"}, dscispec.ApplicationsNamespace)
-			if err != nil {
+			if err := cluster.UpdatePodSecurityRolebinding(cli, []string{"rhods-dashboard"}, dscispec.ApplicationsNamespace); err != nil {
 				return err
 			}
 
@@ -153,24 +152,21 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 			}
 
 			// Create ODHDashboardConfig if it doesn't exist already
-			err = deploy.DeployManifestsFromPath(cli, owner, PathODHDashboardConfig, dscispec.ApplicationsNamespace, ComponentNameSupported, enabled)
-			if err != nil {
+			if err := deploy.DeployManifestsFromPath(cli, owner, PathODHDashboardConfig, dscispec.ApplicationsNamespace, ComponentNameSupported, enabled); err != nil {
 				return fmt.Errorf("failed to set dashboard config from %s: %w", PathODHDashboardConfig, err)
 			}
 
 			// Apply modelserving config
-			err = deploy.DeployManifestsFromPath(cli, owner, PathOVMS, dscispec.ApplicationsNamespace, ComponentNameSupported, enabled)
-			if err != nil {
+			if err := deploy.DeployManifestsFromPath(cli, owner, PathOVMS, dscispec.ApplicationsNamespace, ComponentNameSupported, enabled); err != nil {
 				return fmt.Errorf("failed to set dashboard OVMS from %s: %w", PathOVMS, err)
 			}
 
 			// Apply anaconda config
-			err = common.CreateSecret(cli, "anaconda-ce-access", dscispec.ApplicationsNamespace)
-			if err != nil {
+			if err := cluster.CreateSecret(cli, "anaconda-ce-access", dscispec.ApplicationsNamespace); err != nil {
 				return fmt.Errorf("failed to create access-secret for anaconda: %w", err)
 			}
-			err = deploy.DeployManifestsFromPath(cli, owner, PathAnaconda, dscispec.ApplicationsNamespace, ComponentNameSupported, enabled)
-			if err != nil {
+
+			if err := deploy.DeployManifestsFromPath(cli, owner, PathAnaconda, dscispec.ApplicationsNamespace, ComponentNameSupported, enabled); err != nil {
 				return fmt.Errorf("failed to deploy anaconda resources from %s: %w", PathAnaconda, err)
 			}
 		}

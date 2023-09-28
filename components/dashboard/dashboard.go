@@ -5,6 +5,7 @@ package dashboard
 import (
 	"context"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -12,11 +13,14 @@ import (
 
 	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
+	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization/servicemesh"
+	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization/servicemesh/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/common"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -40,6 +44,9 @@ var (
 var imageParamMap = map[string]string{
 	"odh-dashboard-image": "RELATED_IMAGE_ODH_DASHBOARD_IMAGE",
 }
+
+// Verifies that Dashboard implements ComponentInterface
+var _ components.ComponentInterface = (*Dashboard)(nil)
 
 type Dashboard struct {
 	components.Component `json:""`
@@ -179,9 +186,9 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 		}
 	}
 
-	/*if dscispec.ServiceMesh.IsEnabled() != nil {
-		// TODO swap to service-mesh overlay if enabled && path exists
-	}*/
+	if err := d.configureServiceMesh(dscispec); err != nil {
+		return err
+	}
 
 	// Deploy odh-dashboard manifests
 	if platform == deploy.OpenDataHub || platform == "" {
@@ -255,7 +262,39 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 	}
 }
 
-func (d *Dashboard) DeepCopyInto(out *Dashboard) {
-	*out = *d
-	out.Component = d.Component
+func (d *Dashboard) DeepCopyInto(target *Dashboard) {
+	*target = *d
+	target.Component = d.Component
+}
+
+func (d *Dashboard) configureServiceMesh(dscispec *dsci.DSCInitializationSpec) error {
+	serviceMeshSpec := dscispec.ServiceMesh
+	if serviceMeshSpec.ManagementState == operatorv1.Managed /*&& platform == deploy.OpenDataHub */ {
+		var rootDir = filepath.Join(feature.BaseOutputDir, dscispec.ApplicationsNamespace)
+		if err := servicemesh.CopyEmbeddedFiles("templates", rootDir); err != nil {
+			return errors.WithStack(err)
+		}
+
+		createMeshResources, err := feature.CreateFeature("create-service-mesh-routing-resources-for-dashboard").
+			For(dscispec).
+			Manifests(
+				path.Join(rootDir, feature.ControlPlaneDir, "components", d.GetComponentName()),
+			).
+			WithResources(feature.ServiceMeshEnabledInDashboard).
+			WithData(feature.ClusterDetails).
+			Postconditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.Mesh.Namespace),
+			).
+			Load()
+
+		if err != nil {
+			return err
+		}
+
+		if err := createMeshResources.Apply(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -8,6 +8,12 @@ rules:
 - apiGroups:
   - '*'
   resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - '*'
+  resources:
   - customresourcedefinitions
   verbs:
   - get
@@ -300,6 +306,12 @@ rules:
   verbs:
   - list
   - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - ingresses
+  verbs:
+  - get
 - apiGroups:
   - console.openshift.io
   resources:
@@ -622,6 +634,18 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - dscinitialization.opendatahub.io
+  resources:
+  - servicemeshresourcetrackers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - events.k8s.io
   resources:

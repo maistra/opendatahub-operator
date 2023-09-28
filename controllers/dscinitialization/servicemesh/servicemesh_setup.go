@@ -5,38 +5,31 @@ import (
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization/servicemesh/feature"
 	"github.com/pkg/errors"
-	"k8s.io/client-go/rest"
 	"path"
 	"path/filepath"
 	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	PluginName = "service-mesh"
-)
-
-var log = ctrlLog.Log.WithName(PluginName)
+var log = ctrlLog.Log.WithName("service-mesh")
 
 type ServiceMeshInitializer struct {
 	*v1.DSCInitializationSpec
-	config   *rest.Config
 	features []*feature.Feature
 }
 
-func NewServiceMeshInstaller(restConfig *rest.Config, spec *v1.DSCInitializationSpec) *ServiceMeshInitializer {
+func NewServiceMeshInitializer(spec *v1.DSCInitializationSpec) (*ServiceMeshInitializer, error) {
 	return &ServiceMeshInitializer{
 		DSCInitializationSpec: spec,
-		config:                restConfig,
-	}
-
+	}, nil
 }
 
-// Init performs validation of the plugin spec and ensures all resources,
-// such as features and their templates, are processed and initialized.
-func (s *ServiceMeshInitializer) Init() error {
-	log.Info("Initializing", "plugin", PluginName)
+// Configure performs validation of the spec and ensures all resources,
+// such as features and their templates, are processed and initialized
+// before proceeding with the actual cluster set-up.
+func (s *ServiceMeshInitializer) Configure() error {
+	log.Info("Initializing Service Mesh configuration")
 
-	serviceMeshSpec := s.DSCInitializationSpec.ServiceMesh
+	serviceMeshSpec := &s.DSCInitializationSpec.ServiceMesh
 
 	if err := serviceMeshSpec.SetDefaults(); err != nil {
 		return errors.WithStack(err)
@@ -57,43 +50,46 @@ func (s *ServiceMeshInitializer) Init() error {
 		}
 	*/
 
-	return s.enableFeatures()
+	if err := s.configureServiceMeshFeatures(); err != nil {
+		return err
+	}
+
+	var applyErrors *multierror.Error
+
+	for _, f := range s.features {
+		err := f.Apply()
+		applyErrors = multierror.Append(applyErrors, err)
+	}
+
+	return applyErrors.ErrorOrNil()
 }
 
-func (s *ServiceMeshInitializer) enableFeatures() error {
+// Delete ... TODO to be called as part of finalizer
+func (s *ServiceMeshInitializer) Delete() error {
+	var cleanupErrors *multierror.Error
+	// Performs cleanups in reverse order (stack), this way e.g. we can unpatch SMCP before deleting it (if managed)
+	// Though it sounds unnecessary it keeps features isolated and there is no need to rely on the InstallationMode
+	// between the features when it comes to clean-up. This is based on the assumption, that features
+	// are created in the correct order or are self-contained.
+	for i := len(s.features) - 1; i >= 0; i-- {
+		log.Info("cleanup", "name", s.features[i].Name)
+		cleanupErrors = multierror.Append(cleanupErrors, s.features[i].Cleanup())
+	}
+
+	return cleanupErrors.ErrorOrNil()
+}
+
+func (s *ServiceMeshInitializer) configureServiceMeshFeatures() error {
 
 	var rootDir = filepath.Join(feature.BaseOutputDir, s.DSCInitializationSpec.ApplicationsNamespace)
-	if err := copyEmbeddedFiles("templates", rootDir); err != nil {
+	if err := CopyEmbeddedFiles("templates", rootDir); err != nil {
 		return errors.WithStack(err)
 	}
 
 	serviceMeshSpec := s.ServiceMesh
 
-	if smcpInstallation, err := feature.CreateFeature("control-plane-install-managed").
-		For(s.DSCInitializationSpec).
-		UsingConfig(s.config).
-		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "control-plane-minimal.tmpl"),
-		).
-		EnabledIf(func(f *feature.Feature) bool {
-			return f.Spec.Mesh.InstallationMode != v1.PreInstalled
-		}).
-		Preconditions(
-			feature.EnsureCRDIsInstalled("servicemeshcontrolplanes.maistra.io"),
-			feature.CreateNamespace(serviceMeshSpec.Mesh.Namespace),
-		).
-		Postconditions(
-			feature.WaitForControlPlaneToBeReady,
-		).
-		Load(); err != nil {
-		return err
-	} else {
-		s.features = append(s.features, smcpInstallation)
-	}
-
 	if oauth, err := feature.CreateFeature("control-plane-configure-oauth").
 		For(s.DSCInitializationSpec).
-		UsingConfig(s.config).
 		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "base"),
 			path.Join(rootDir, feature.ControlPlaneDir, "oauth"),
@@ -121,7 +117,6 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 
 	if cfMaps, err := feature.CreateFeature("shared-config-maps").
 		For(s.DSCInitializationSpec).
-		UsingConfig(s.config).
 		WithResources(feature.ConfigMaps).
 		Load(); err != nil {
 		return err
@@ -131,7 +126,6 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 
 	if serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
 		For(s.DSCInitializationSpec).
-		UsingConfig(s.config).
 		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "smm.tmpl"),
 			path.Join(rootDir, feature.ControlPlaneDir, "namespace.patch.tmpl"),
@@ -143,13 +137,8 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 		s.features = append(s.features, serviceMesh)
 	}
 
-	if dashboard, err := feature.CreateFeature("app-enable-service-mesh-in-dashboard").
+	if gatewayRoute, err := feature.CreateFeature("create-gateway-route").
 		For(s.DSCInitializationSpec).
-		UsingConfig(s.config).
-		EnabledIf(func(f *feature.Feature) bool {
-			return true
-			//return s.hasDefinedApplication("odh-dashboard")
-		}).
 		Manifests(
 			path.Join(rootDir, feature.ControlPlaneDir, "routing"),
 		).
@@ -161,12 +150,11 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 		Load(); err != nil {
 		return err
 	} else {
-		s.features = append(s.features, dashboard)
+		s.features = append(s.features, gatewayRoute)
 	}
 
 	if dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
 		For(s.DSCInitializationSpec).
-		UsingConfig(s.config).
 		WithResources(feature.MigratedDataScienceProjects).
 		Load(); err != nil {
 		return err
@@ -176,7 +164,6 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 
 	if extAuthz, err := feature.CreateFeature("control-plane-setup-external-authorization").
 		For(s.DSCInitializationSpec).
-		UsingConfig(s.config).
 		Manifests(
 			path.Join(rootDir, feature.AuthDir, "auth-smm.tmpl"),
 			path.Join(rootDir, feature.AuthDir, "base"),
@@ -201,36 +188,4 @@ func (s *ServiceMeshInitializer) enableFeatures() error {
 	}
 
 	return nil
-}
-
-// Apply ...
-func (s *ServiceMeshInitializer) Apply() error {
-	var applyErrors *multierror.Error
-
-	for _, f := range s.features {
-		err := f.Apply()
-		applyErrors = multierror.Append(applyErrors, err)
-	}
-
-	return applyErrors.ErrorOrNil()
-}
-
-// Delete ... TODO to be called as part of finalizer
-func (s *ServiceMeshInitializer) Delete() error {
-	var cleanupErrors *multierror.Error
-	// Performs cleanups in reverse order (stack), this way e.g. we can unpatch SMCP before deleting it (if managed)
-	// Though it sounds unnecessary it keeps features isolated and there is no need to rely on the InstallationMode
-	// between the features when it comes to clean-up. This is based on the assumption, that features
-	// are created in the correct order or are self-contained.
-	for i := len(s.features) - 1; i >= 0; i-- {
-		log.Info("cleanup", "name", s.features[i].Name)
-		cleanupErrors = multierror.Append(cleanupErrors, s.features[i].Cleanup())
-	}
-
-	return cleanupErrors.ErrorOrNil()
-}
-
-// TODO: error handle, check for empty spec?
-func (s *ServiceMeshInitializer) GetPluginSpec() (*v1.ServiceMeshSpec, error) {
-	return &s.DSCInitializationSpec.ServiceMesh, nil
 }

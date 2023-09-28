@@ -122,6 +122,12 @@ spec:
                         description: Namespace where it is deployed.
                         type: string
                     type: object
+                  managementState:
+                    enum:
+                    - Managed
+                    - Removed
+                    pattern: ^(Managed|Unmanaged|Force|Removed)$
+                    type: string
                   mesh:
                     description: Mesh holds configuration of Service Mesh used by
                       Opendatahub.

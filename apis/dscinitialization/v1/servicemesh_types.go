@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"strconv"
@@ -10,6 +11,8 @@ import (
 
 // ServiceMeshSpec configures Service Mesh.
 type ServiceMeshSpec struct {
+	// +kubebuilder:validation:Enum=Managed;Removed
+	ManagementState operatorv1.ManagementState `json:"managementState,omitempty"`
 	// Mesh holds configuration of Service Mesh used by Opendatahub.
 	Mesh MeshSpec `json:"mesh,omitempty"`
 	// Auth holds configuration of authentication and authorization services

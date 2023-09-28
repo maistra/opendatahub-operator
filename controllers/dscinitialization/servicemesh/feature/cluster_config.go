@@ -19,6 +19,8 @@ import (
 	"strings"
 )
 
+// +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get
+
 func GetDomain(dynamicClient dynamic.Interface) (string, error) {
 	cluster, err := dynamicClient.Resource(
 		schema.GroupVersionResource{

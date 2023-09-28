@@ -138,7 +138,6 @@ func (f *Feature) createConfigMap(cfgMapName string, data map[string]string) err
 	}
 
 	configMaps := f.clientset.CoreV1().ConfigMaps(configMap.Namespace)
-
 	_, err := configMaps.Get(context.TODO(), configMap.Name, metav1.GetOptions{})
 	if k8serrors.IsNotFound(err) {
 		_, err = configMaps.Create(context.TODO(), configMap, metav1.CreateOptions{})

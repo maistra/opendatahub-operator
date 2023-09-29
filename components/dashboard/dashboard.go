@@ -29,6 +29,7 @@ var (
 	ComponentName          = "odh-dashboard"
 	ComponentNameSupported = "rhods-dashboard"
 	Path                   = deploy.DefaultManifestPath + "/" + ComponentName + "/base"
+	PathServiceMesh        = deploy.DefaultManifestPath + "/" + ComponentName + "/overlays/service-mesh"
 	PathSupported          = deploy.DefaultManifestPath + "/" + ComponentName + "/overlays/rhods"
 	PathISVSM              = deploy.DefaultManifestPath + "/" + ComponentName + "/apps/apps-onprem"
 	PathISVAddOn           = deploy.DefaultManifestPath + "/" + ComponentName + "/apps/apps-addon"
@@ -50,7 +51,6 @@ var _ components.ComponentInterface = (*Dashboard)(nil)
 
 type Dashboard struct {
 	components.Component `json:""`
-	img                  string
 }
 
 func (d *Dashboard) OverrideManifests(platform string) error {

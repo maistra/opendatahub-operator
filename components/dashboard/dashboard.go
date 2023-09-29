@@ -129,7 +129,9 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 		}
 
 		if dscispec.DevFlags.ManifestsUri == "" {
-			return deploy.ApplyImageParams(PathSupported, imageParamMap)
+			if err := deploy.ApplyImageParams(PathSupported, imageParamMap); err != nil {
+				return err
+			}
 		}
 
 		if err := d.configureServiceMesh(dscispec); err != nil {

@@ -185,7 +185,7 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	if platform == deploy.OpenDataHub && instance.Spec.ServiceMesh.ManagementState == operatorv1.Managed {
+	if /* platform == deploy.OpenDataHub &&  */ instance.Spec.ServiceMesh.ManagementState == operatorv1.Managed {
 
 		serviceMeshInitializer, err := servicemesh.NewServiceMeshInitializer(&instance.Spec)
 		if err != nil {

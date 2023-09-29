@@ -142,8 +142,11 @@ func (d *Dashboard) ReconcileComponent(cli client.Client, owner metav1.Object, d
 
 	// Deploy odh-dashboard manifests
 	if platform == deploy.OpenDataHub || platform == "" {
-		err = deploy.DeployManifestsFromPath(cli, owner, Path, dscispec.ApplicationsNamespace, ComponentName, enabled)
-		if err != nil {
+		base := Path
+		if dscispec.ServiceMesh.ManagementState == operatorv1.Managed {
+			base = PathServiceMesh
+		}
+		if err = deploy.DeployManifestsFromPath(cli, owner, base, dscispec.ApplicationsNamespace, ComponentName, enabled); err != nil {
 			return err
 		}
 	} else if platform == deploy.SelfManagedRhods || platform == deploy.ManagedRhods {
@@ -262,7 +265,7 @@ func (d *Dashboard) deployConsoleLink(cli client.Client, owner metav1.Object, na
 
 func (d *Dashboard) configureServiceMesh(dscispec *dsci.DSCInitializationSpec) error {
 	serviceMeshSpec := dscispec.ServiceMesh
-	if serviceMeshSpec.ManagementState == operatorv1.Managed /*&& platform == deploy.OpenDataHub */ {
+	if serviceMeshSpec.ManagementState == operatorv1.Managed /*&& (platform == deploy.OpenDataHub || platform == "") */ {
 		var rootDir = filepath.Join(feature.BaseOutputDir, dscispec.ApplicationsNamespace)
 		if err := servicemesh.CopyEmbeddedFiles("templates", rootDir); err != nil {
 			return errors.WithStack(err)

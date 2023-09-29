@@ -41,10 +41,6 @@ func (s *ServiceMeshInitializer) Configure() error {
 
 	// TODO rework how this should be handled (reverse control - component calls it instead?)
 	/*
-		if err := s.addServiceMeshOverlays(); err != nil {
-			return internalError(err)
-		}
-
 		if err := s.addOssmEnvFile("USE_ISTIO", "true", "ISTIO_GATEWAY", fmt.Sprintf("%s/%s", pluginSpec.AppNamespace, "odh-gateway")); err != nil {
 			return errors.WithStack(err)
 		}

@@ -31,10 +31,6 @@ func (s *ServiceMeshInitializer) Configure() error {
 
 	serviceMeshSpec := &s.DSCInitializationSpec.ServiceMesh
 
-	if err := serviceMeshSpec.SetDefaults(); err != nil {
-		return errors.WithStack(err)
-	}
-
 	if valid, reason := serviceMeshSpec.IsValid(); !valid {
 		return errors.New(reason)
 	}

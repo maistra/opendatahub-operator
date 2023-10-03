@@ -2,17 +2,19 @@ package feature
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
 	BaseDir         = "templates/servicemesh/"
 	ControlPlaneDir = BaseDir + "control-plane"
 	AuthDir         = BaseDir + "authorino"
+	KServeDir       = BaseDir + "kserve"
 	BaseOutputDir   = "/tmp/servicemesh-manifests/"
 )
 

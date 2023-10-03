@@ -1,12 +1,13 @@
 package servicemesh
 
 import (
+	"path"
+	"path/filepath"
+
 	"github.com/hashicorp/go-multierror"
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization/servicemesh/feature"
 	"github.com/pkg/errors"
-	"path"
-	"path/filepath"
 	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -177,6 +178,19 @@ func (s *ServiceMeshInitializer) configureServiceMeshFeatures() error {
 		return err
 	} else {
 		s.features = append(s.features, extAuthz)
+	}
+
+	if kserve, err := feature.CreateFeature("configure-kserve-for-authorino").
+		For(s.DSCInitializationSpec).
+		Manifests(
+			path.Join(rootDir, feature.KServeDir, "activator-envoyfilter.tmpl.yaml"),
+			path.Join(rootDir, feature.KServeDir, "envoy-oauth-temp-fix.tmpl.yaml"),
+			path.Join(rootDir, feature.KServeDir, "grpc-authorizationpolicy.tmpl.yaml"),
+		).
+		Load(); err != nil {
+		return err
+	} else {
+		s.features = append(s.features, kserve)
 	}
 
 	return nil

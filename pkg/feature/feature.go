@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/hashicorp/go-multierror"
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh/io"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/gvr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -168,13 +169,13 @@ func (f *Feature) apply(m manifest) error {
 		applier = func(filename string) error {
 			log.Info("patching using manifest", "feature", f.Name, "name", m.name, "path", targetPath)
 
-			return f.patchResourceFromFile(filename)
+			return io.PatchResourceFromFile(f.DynamicClient, log, filename)
 		}
 	} else {
 		applier = func(filename string) error {
 			log.Info("applying manifest", "feature", f.Name, "name", m.name, "path", targetPath)
 
-			return f.createResourceFromFile(filename)
+			return io.CreateResourceFromFile(f.Client, log, f.OwnerReference(), filename)
 		}
 	}
 

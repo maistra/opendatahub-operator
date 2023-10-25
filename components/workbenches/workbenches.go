@@ -2,6 +2,7 @@
 package workbenches
 
 import (
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh/io"
 	"path/filepath"
 	"strings"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/servicemesh/io"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"

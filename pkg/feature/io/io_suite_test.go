@@ -10,5 +10,5 @@ import (
 func TestOssmCommon(t *testing.T) {
 	RegisterFailHandler(Fail)
 	// for integration tests see tests/integration directory
-	RunSpecs(t, "Openshift Service Mesh io unit tests")
+	RunSpecs(t, "Feature's io unit tests")
 }

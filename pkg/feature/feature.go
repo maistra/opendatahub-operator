@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/hashicorp/go-multierror"
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh/io"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/io"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/gvr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"

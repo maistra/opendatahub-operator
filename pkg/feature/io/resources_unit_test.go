@@ -3,7 +3,7 @@ package io_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh/io"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/io"
 	"os"
 	"path/filepath"
 )

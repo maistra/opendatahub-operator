@@ -2,7 +2,7 @@
 package workbenches
 
 import (
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh/io"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/io"
 	"path/filepath"
 	"strings"
 

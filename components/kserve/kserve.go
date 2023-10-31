@@ -152,7 +152,7 @@ func (k *Kserve) ReconcileComponent(cli client.Client, owner metav1.Object, dsci
 	return nil
 }
 
-func (d *Kserve) Cleanup(cli client.Client, dscispec *dsci.DSCInitializationSpec) error {
+func (k *Kserve) Cleanup(cli client.Client, dscispec *dsci.DSCInitializationSpec) error {
 	shouldConfigureServiceMesh, err := deploy.ShouldConfigureServiceMesh(cli, dscispec)
 	if err != nil {
 		return err

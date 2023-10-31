@@ -152,6 +152,27 @@ func (k *Kserve) ReconcileComponent(cli client.Client, owner metav1.Object, dsci
 	return nil
 }
 
+func (d *Kserve) Cleanup(cli client.Client, dscispec *dsci.DSCInitializationSpec) error {
+	shouldConfigureServiceMesh, err := deploy.ShouldConfigureServiceMesh(cli, dscispec)
+	if err != nil {
+		return err
+	}
+
+	if shouldConfigureServiceMesh {
+		serviceMeshInitializer := servicemesh.NewServiceMeshInitializer(dscispec, d.defineServiceMeshFeatures(dscispec))
+
+		if err := serviceMeshInitializer.Prepare(); err != nil {
+			return err
+		}
+
+		if err := serviceMeshInitializer.Delete(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (k *Kserve) DeepCopyInto(target *Kserve) {
 	*target = *k
 	target.Component = k.Component

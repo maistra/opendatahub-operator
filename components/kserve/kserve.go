@@ -201,7 +201,7 @@ func (k *Kserve) configureServiceMesh(cli client.Client, dscispec *dsci.DSCIniti
 }
 
 func (k *Kserve) defineServiceMeshFeatures(dscispec *dsci.DSCInitializationSpec) feature.DefinedFeatures {
-	return func(s * feature.FeaturesInitializer) error {
+	return func(s *feature.FeaturesInitializer) error {
 		var rootDir = filepath.Join(feature.BaseOutputDir, dscispec.ApplicationsNamespace)
 		if err := feature.CopyEmbeddedFiles("templates", rootDir); err != nil {
 			return err

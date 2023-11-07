@@ -146,8 +146,8 @@ func (fb *featureBuilder) EnabledWhen(enabled func(f *Feature) bool) *featureBui
 		f.Enabled = enabled(f)
 
 		return nil
-
 	})
+
 	return fb
 }
 

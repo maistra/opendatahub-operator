@@ -20,7 +20,7 @@ func ConfigureServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 	smcpCreation, errSmcp := feature.CreateFeature("mesh-control-plane-creation").
 		For(f.DSCInitializationSpec).
 		Manifests(
-			//TODO align
+			// TODO align
 			path.Join(rootDir, templatesDir, "base"),
 		).
 		PreConditions(
@@ -40,7 +40,7 @@ func ConfigureServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 		metricsCollection, errMetrics := feature.CreateFeature("mesh-metrics-collection").
 			For(f.DSCInitializationSpec).
 			Manifests(
-				//TODO align
+				// TODO align
 				path.Join(rootDir, templatesDir, "metrics-collection"),
 			).
 			PreConditions(

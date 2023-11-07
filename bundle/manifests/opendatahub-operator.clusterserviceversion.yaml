@@ -148,9 +148,18 @@ spec:
       - description: Enable monitoring on specified namespace
         displayName: Monitoring
         path: monitoring
-      - description: Enable Service Mesh for Data Science Clusters
+      - description: Configures Service Mesh as networking layer for Data Science
+          Clusters components. The Service Mesh is a mandatory prerequisite for single
+          model serving (KServe) and you should review this configuration if you are
+          planning to use KServe. For other components, it enhances user experience;
+          e.g. it provides unified authentication giving a Single Sign On experience.
         displayName: Service Mesh
         path: serviceMesh
+      - description: Configures Serverless (KNative Serving). This is a prerequisite
+          for single model serving (KServe) and you should review this configuration
+          if you are planning to use KServe.
+        displayName: Serverless
+        path: serverless
       - description: Internal development useful field to test customizations. This
           is not recommended to be used in production environment.
         displayName: Dev Flags
@@ -838,18 +847,6 @@ spec:
           - update
           - watch
         - apiGroups:
-          - dscinitialization.opendatahub.io
-          resources:
-          - servicemeshresourcetrackers
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
           - events.k8s.io
           resources:
           - events
@@ -1236,6 +1233,12 @@ spec:
           - operator.authorino.kuadrant.io
           resources:
           - authorinos
+          verbs:
+          - '*'
+        - apiGroups:
+          - operator.knative.dev
+          resources:
+          - knativeservings
           verbs:
           - '*'
         - apiGroups:

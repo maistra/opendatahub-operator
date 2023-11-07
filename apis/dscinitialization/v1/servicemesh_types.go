@@ -2,7 +2,6 @@ package v1
 
 import (
 	operatorv1 "github.com/openshift/api/operator/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ServiceMeshSpec configures Service Mesh.
@@ -69,46 +68,7 @@ type AuthorinoSpec struct {
 	Image string `json:"image,omitempty"`
 }
 
-// FeatureTracker is a cluster-scoped resource for tracking objects
-// created through Features API for Data Science Platform.
-// It's primarily used as owner reference for resources created across namespaces so that they can be
-// garbage collected by Kubernetes when they're not needed anymore.
-// +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster
-type FeatureTracker struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   FeatureTrackerSpec   `json:"spec,omitempty"`
-	Status FeatureTrackerStatus `json:"status,omitempty"`
-}
-
-func (s *FeatureTracker) ToOwnerReference() metav1.OwnerReference {
-	return metav1.OwnerReference{
-		APIVersion: s.APIVersion,
-		Kind:       s.Kind,
-		Name:       s.Name,
-		UID:        s.UID,
-	}
-}
-
-// FeatureTrackerSpec defines the desired state of FeatureTracker.
-type FeatureTrackerSpec struct {
-}
-
-// FeatureTrackerStatus defines the observed state of FeatureTracker.
-type FeatureTrackerStatus struct {
-}
-
-// +kubebuilder:object:root=true
-
-// FeatureTrackerList contains a list of FeatureTracker.
-type FeatureTrackerList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []FeatureTracker `json:"items"`
-}
-
+// TODO move logic to sth like management state
 // IsValid returns true if the spec is a valid and complete.
 // If invalid it provides message with the reasons.
 func (s *ServiceMeshSpec) IsValid() (bool, string) {

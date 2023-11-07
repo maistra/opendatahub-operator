@@ -2,17 +2,18 @@
 package workbenches
 
 import (
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 	"path/filepath"
 	"strings"
+
+	operatorv1 "github.com/openshift/api/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
 
 var (
@@ -113,7 +114,7 @@ func (w *Workbenches) ReconcileComponent(cli client.Client, owner metav1.Object,
 		}
 
 		if platform == deploy.SelfManagedRhods || platform == deploy.ManagedRhods {
-			if err := cluster.CreateNamespace(cli, "rhods-notebooks"); err != nil {
+			if _, err := cluster.CreateNamespace(cli, "rhods-notebooks"); err != nil {
 				// no need to log error as it was already logged in createOdhNamespace
 				return err
 			}
@@ -141,7 +142,12 @@ func (w *Workbenches) ReconcileComponent(cli client.Client, owner metav1.Object,
 	if enabled {
 		if dscispec.DevFlags.ManifestsUri == "" && len(w.DevFlags.Manifests) == 0 {
 			if platform == deploy.ManagedRhods || platform == deploy.SelfManagedRhods {
+				// for kf-notebook-controller image
 				if err := deploy.ApplyParams(notebookControllerPath, w.SetImageParamsMap(imageParamMap), false); err != nil {
+					return err
+				}
+				// for odh-notebook-controller image
+				if err := deploy.ApplyParams(kfnotebookControllerPath, w.SetImageParamsMap(imageParamMap), false); err != nil {
 					return err
 				}
 			}
@@ -149,11 +155,11 @@ func (w *Workbenches) ReconcileComponent(cli client.Client, owner metav1.Object,
 	}
 
 	if platform == deploy.OpenDataHub || platform == deploy.Unknown {
-		// only for ODH after transit to kubeflow repo
 		path := kfnotebookControllerPath
 		if shouldConfigureServiceMesh {
 			path = kfnotebookControllerServiceMeshPath
 		}
+
 		err = deploy.DeployManifestsFromPath(cli, owner,
 			path,
 			dscispec.ApplicationsNamespace,
@@ -169,7 +175,11 @@ func (w *Workbenches) ReconcileComponent(cli client.Client, owner metav1.Object,
 			enabled)
 		return err
 	} else {
-		return deploy.DeployManifestsFromPath(cli, owner, notebookImagesPathSupported, dscispec.ApplicationsNamespace, ComponentName, enabled)
+		return deploy.DeployManifestsFromPath(cli, owner,
+			notebookImagesPathSupported,
+			dscispec.ApplicationsNamespace,
+			ComponentName,
+			enabled)
 	}
 }
 

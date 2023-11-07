@@ -3,15 +3,47 @@ package servicemesh
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/hashicorp/go-multierror"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/gvr"
 	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"strings"
+
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/gvr"
 )
+
+func SelfSignedCertificate(f *feature.Feature) error {
+	if f.Spec.Mesh.Certificate.Generate {
+		meta := metav1.ObjectMeta{
+			Name:      f.Spec.Mesh.Certificate.Name,
+			Namespace: f.Spec.Mesh.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				f.OwnerReference(),
+			},
+		}
+
+		cert, err := feature.GenerateSelfSignedCertificateAsSecret(f.Spec.Domain, meta)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		_, err = f.Clientset.CoreV1().
+			Secrets(f.Spec.Mesh.Namespace).
+			Create(context.TODO(), cert, metav1.CreateOptions{})
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}
 
 func EnvoyOAuthSecrets(feature *feature.Feature) error {
 	objectMeta := metav1.ObjectMeta{
@@ -78,7 +110,7 @@ func setServiceMeshDisabledFlag(disabled bool) feature.Action {
 		}
 
 		if len(configs.Items) == 0 {
-			log.Info("No odhdashboardconfig found in namespace, doing nothing")
+			log.Info("No odhdashboardconfig found in namespace, doing nothing", "name", feature.Name)
 			return nil
 		}
 
@@ -97,12 +129,12 @@ func setServiceMeshDisabledFlag(disabled bool) feature.Action {
 		if _, err := feature.DynamicClient.Resource(gvr.ODHDashboardConfigGVR).
 			Namespace(feature.Spec.AppNamespace).
 			Update(context.TODO(), &config, metav1.UpdateOptions{}); err != nil {
-			log.Error(err, "Failed to update odhdashboardconfig")
+			log.Error(err, "Failed to update odhdashboardconfig", "name", feature.Name)
 
 			return err
 		}
 
-		log.Info("Successfully patched odhdashboardconfig")
+		log.Info("Successfully patched odhdashboardconfig", "name", feature.Name)
 		return nil
 	}
 }

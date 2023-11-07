@@ -7,15 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -159,7 +160,7 @@ func (k *Kserve) Cleanup(cli client.Client, dscispec *dsci.DSCInitializationSpec
 	}
 
 	if shouldConfigureServiceMesh {
-		serviceMeshInitializer := servicemesh.NewServiceMeshInitializer(dscispec, d.defineServiceMeshFeatures(dscispec))
+		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, k.defineServiceMeshFeatures(dscispec))
 
 		if err := serviceMeshInitializer.Prepare(); err != nil {
 			return err
@@ -185,7 +186,7 @@ func (k *Kserve) configureServiceMesh(cli client.Client, dscispec *dsci.DSCIniti
 	}
 
 	if shouldConfigureServiceMesh {
-		serviceMeshInitializer := servicemesh.NewServiceMeshInitializer(dscispec, k.defineServiceMeshFeatures(dscispec))
+		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, k.defineServiceMeshFeatures(dscispec))
 
 		if err := serviceMeshInitializer.Prepare(); err != nil {
 			return err
@@ -199,8 +200,8 @@ func (k *Kserve) configureServiceMesh(cli client.Client, dscispec *dsci.DSCIniti
 	return nil
 }
 
-func (k *Kserve) defineServiceMeshFeatures(dscispec *dsci.DSCInitializationSpec) servicemesh.DefineFeatures {
-	return func(s *servicemesh.ServiceMeshInitializer) error {
+func (k *Kserve) defineServiceMeshFeatures(dscispec *dsci.DSCInitializationSpec) feature.DefinedFeatures {
+	return func(s * feature.FeaturesInitializer) error {
 		var rootDir = filepath.Join(feature.BaseOutputDir, dscispec.ApplicationsNamespace)
 		if err := feature.CopyEmbeddedFiles("templates", rootDir); err != nil {
 			return err

@@ -22,7 +22,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,7 +52,7 @@ func (f *Feature) createResourceFromFile(filename string) error {
 		ensureNamespaceIsSet(f, u)
 
 		name := u.GetName()
-		namespace := u.GetName()
+		namespace := u.GetNamespace()
 
 		u.SetOwnerReferences([]metav1.OwnerReference{
 			f.OwnerReference(),

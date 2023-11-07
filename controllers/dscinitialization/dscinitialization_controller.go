@@ -21,18 +21,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
 	"path/filepath"
 
 	"github.com/go-logr/logr"
 	operatorv1 "github.com/openshift/api/operator/v1"
-
-	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
-	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -45,6 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
+	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 )
 
 const (
@@ -68,19 +64,13 @@ type DSCInitializationReconciler struct {
 
 // Reconcile contains controller logic specific to DSCInitialization instance updates.
 func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Reconciling DSCInitialization.", "DSCInitialization", req.Namespace, "Request.Name", req.Name)
+	r.Log.Info("Reconciling DSCInitialization.", "DSCInitialization Request.Name", req.Name)
 
 	instances := &dsci.DSCInitializationList{}
 	if err := r.Client.List(ctx, instances); err != nil {
-		r.Log.Error(err, "Failed to retrieve DSCInitialization resource.", "DSCInitialization", req.Namespace, "Request.Name", req.Name)
+		r.Log.Error(err, "Failed to retrieve DSCInitialization resource.", "DSCInitialization Request.Name", req.Name)
 		r.Recorder.Eventf(instances, corev1.EventTypeWarning, "DSCInitializationReconcileError", "Failed to retrieve DSCInitialization instance")
 		return ctrl.Result{}, err
-	}
-
-	if len(instances.Items) > 1 {
-		message := fmt.Sprintf("only one instance of DSCInitialization object is allowed. Update existing instance on namespace %s and name %s", req.Namespace, req.Name)
-
-		return ctrl.Result{}, errors.New(message)
 	}
 
 	if len(instances.Items) == 0 {
@@ -89,16 +79,27 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	instance := &instances.Items[0]
 
+	if len(instances.Items) > 1 {
+		message := fmt.Sprintf("only one instance of DSCInitialization object is allowed. Update existing instance name %s", req.Name)
+
+		_, _ = r.updateStatus(ctx, instance, func(saved *dsci.DSCInitialization) {
+			status.SetErrorCondition(&saved.Status.Conditions, status.DuplicateDSCInitialization, message)
+			saved.Status.Phase = status.PhaseError
+		})
+
+		return ctrl.Result{}, errors.New(message)
+	}
+
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(instance, finalizerName) {
-			r.Log.Info("Adding finalizer for DSCInitialization", "name", instance.Name, "namespace", instance.Namespace, "finalizer", finalizerName)
+			r.Log.Info("Adding finalizer for DSCInitialization", "name", instance.Name, "finalizer", finalizerName)
 			controllerutil.AddFinalizer(instance, finalizerName)
 			if err := r.Update(ctx, instance); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
-		r.Log.Info("Finalization DSCInitialization start deleting instance", "name", instance.Name, "namespace", instance.Namespace, "finalizer", finalizerName)
+		r.Log.Info("Finalization DSCInitialization start deleting instance", "name", instance.Name, "finalizer", finalizerName)
 		if err := r.cleanupServiceMesh(instance); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -122,7 +123,7 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			saved.Status.Phase = status.PhaseProgressing
 		})
 		if err != nil {
-			r.Log.Error(err, "Failed to add conditions to status of DSCInitialization resource.", "DSCInitialization", req.Namespace, "Request.Name", req.Name)
+			r.Log.Error(err, "Failed to add conditions to status of DSCInitialization resource.", "DSCInitialization Request.Name", req.Name)
 			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError",
 				"%s for instance %s", message, instance.Name)
 			return reconcile.Result{}, err
@@ -151,7 +152,7 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return reconcile.Result{}, monitoringErr
 	}
 
-	if errServiceMesh := r.handleServiceMesh(instance); errServiceMesh != nil {
+	if errServiceMesh := r.configureServiceMesh(instance); errServiceMesh != nil {
 		return reconcile.Result{}, errServiceMesh
 	}
 
@@ -165,161 +166,6 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "Failed to update DSCInitialization status")
 	}
 	return ctrl.Result{}, nil
-}
-
-func (r *DSCInitializationReconciler) handleServiceMesh(instance *dsci.DSCInitialization) error {
-	shouldConfigureServiceMesh, err := deploy.ShouldConfigureServiceMesh(r.Client, &instance.Spec)
-	if err != nil {
-		return err
-	}
-
-	if shouldConfigureServiceMesh {
-		serviceMeshInitializer := servicemesh.NewServiceMeshInitializer(&instance.Spec, configureServiceMeshFeatures)
-
-		if err := serviceMeshInitializer.Prepare(); err != nil {
-			r.Log.Error(err, "failed configuring service mesh resources")
-			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed configuring service mesh resources")
-
-			return err
-		}
-
-		if err := serviceMeshInitializer.Apply(); err != nil {
-			r.Log.Error(err, "failed applying service mesh resources")
-			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed applying service mesh resources")
-
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (r *DSCInitializationReconciler) cleanupServiceMesh(instance *dsci.DSCInitialization) error {
-	shouldConfigureServiceMesh, err := deploy.ShouldConfigureServiceMesh(r.Client, &instance.Spec)
-	if err != nil {
-		return err
-	}
-
-	if shouldConfigureServiceMesh {
-		serviceMeshInitializer := servicemesh.NewServiceMeshInitializer(&instance.Spec, configureServiceMeshFeatures)
-		if err := serviceMeshInitializer.Prepare(); err != nil {
-			return err
-		}
-		if err := serviceMeshInitializer.Delete(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func configureServiceMeshFeatures(s *servicemesh.ServiceMeshInitializer) error {
-	var rootDir = filepath.Join(feature.BaseOutputDir, s.DSCInitializationSpec.ApplicationsNamespace)
-	if err := feature.CopyEmbeddedFiles("templates", rootDir); err != nil {
-		return err
-	}
-
-	serviceMeshSpec := s.ServiceMesh
-
-	if oauth, err := feature.CreateFeature("control-plane-configure-oauth").
-		For(s.DSCInitializationSpec).
-		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "base"),
-			path.Join(rootDir, feature.ControlPlaneDir, "oauth"),
-			path.Join(rootDir, feature.ControlPlaneDir, "filters"),
-		).
-		WithResources(
-			feature.SelfSignedCertificate,
-			servicemesh.EnvoyOAuthSecrets,
-		).
-		WithData(servicemesh.ClusterDetails, servicemesh.OAuthConfig).
-		PreConditions(
-			servicemesh.EnsureServiceMeshInstalled,
-		).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.Mesh.Namespace),
-		).
-		OnDelete(
-			servicemesh.RemoveOAuthClient,
-			servicemesh.RemoveTokenVolumes,
-		).Load(); err != nil {
-		return err
-	} else {
-		s.Features = append(s.Features, oauth)
-	}
-
-	if cfMaps, err := feature.CreateFeature("shared-config-maps").
-		For(s.DSCInitializationSpec).
-		WithResources(servicemesh.ConfigMaps).
-		Load(); err != nil {
-		return err
-	} else {
-		s.Features = append(s.Features, cfMaps)
-	}
-
-	if serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
-		For(s.DSCInitializationSpec).
-		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "smm.tmpl"),
-			path.Join(rootDir, feature.ControlPlaneDir, "namespace.patch.tmpl"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		Load(); err != nil {
-		return err
-	} else {
-		s.Features = append(s.Features, serviceMesh)
-	}
-
-	if gatewayRoute, err := feature.CreateFeature("create-gateway-route").
-		For(s.DSCInitializationSpec).
-		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "routing"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.Mesh.Namespace),
-		).
-		Load(); err != nil {
-		return err
-	} else {
-		s.Features = append(s.Features, gatewayRoute)
-	}
-
-	if dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
-		For(s.DSCInitializationSpec).
-		WithResources(servicemesh.MigratedDataScienceProjects).
-		Load(); err != nil {
-		return err
-	} else {
-		s.Features = append(s.Features, dataScienceProjects)
-	}
-
-	if extAuthz, err := feature.CreateFeature("control-plane-setup-external-authorization").
-		For(s.DSCInitializationSpec).
-		Manifests(
-			path.Join(rootDir, feature.AuthDir, "auth-smm.tmpl"),
-			path.Join(rootDir, feature.AuthDir, "base"),
-			path.Join(rootDir, feature.AuthDir, "rbac"),
-			path.Join(rootDir, feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		PreConditions(
-			feature.CreateNamespace(serviceMeshSpec.Auth.Namespace),
-			feature.EnsureCRDIsInstalled("authconfigs.authorino.kuadrant.io"),
-			servicemesh.EnsureServiceMeshInstalled,
-		).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.Mesh.Namespace),
-			feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace),
-		).
-		OnDelete(servicemesh.RemoveExtensionProvider).
-		Load(); err != nil {
-		return err
-	} else {
-		s.Features = append(s.Features, extAuthz)
-	}
-
-	return nil
 }
 
 func (r *DSCInitializationReconciler) applyRHODSConfig(ctx context.Context, instance *dsci.DSCInitialization, platform deploy.Platform) error {

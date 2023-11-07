@@ -1,4 +1,4 @@
-package servicemesh_test
+package features_test
 
 import (
 	"context"
@@ -31,9 +31,9 @@ var (
 
 var testScheme = runtime.NewScheme()
 
-func TestServiceMeshSetupIntegration(t *testing.T) {
+func TestFeaturesIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Openshift Service Mesh infra setup integration")
+	RunSpecs(t, "Basic Features DSL integration tests")
 }
 
 var _ = BeforeSuite(func() {
@@ -59,7 +59,7 @@ var _ = BeforeSuite(func() {
 			Paths: []string{
 				filepath.Join(projectDir, "config", "crd", "bases"),
 				filepath.Join(projectDir, "config", "crd", "dashboard-crds"),
-				filepath.Join(projectDir, "tests", "integration", "servicemesh", "crd"),
+				filepath.Join(projectDir, "tests", "integration", "features", "crd"),
 			},
 			ErrorIfPathMissing: true,
 			CleanUpAfterUse:    false,

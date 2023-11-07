@@ -6,19 +6,19 @@ import (
 	"path/filepath"
 	"strings"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
-	ComponentName = "model-mesh"
-	Path          = deploy.DefaultManifestPath + "/" + ComponentName + "/overlays/odh"
-	// monitoringPath         = deploy.DefaultManifestPath + "/" + "modelmesh-monitoring/base"
+	ComponentName          = "model-mesh"
+	Path                   = deploy.DefaultManifestPath + "/" + ComponentName + "/overlays/odh"
 	DependentComponentName = "odh-model-controller"
 	DependentPath          = deploy.DefaultManifestPath + "/" + DependentComponentName + "/base"
 )
@@ -142,15 +142,6 @@ func (m *ModelMeshServing) ReconcileComponent(cli client.Client, owner metav1.Ob
 	if err != nil {
 		return err
 	}
-	// var monitoringNamespace string
-	// if dscInit.Spec.Monitoring.Namespace != "" {
-	// 	monitoringNamespace = dscInit.Spec.Monitoring.Namespace
-	// } else {
-	// 	monitoringNamespace = dscispec.ApplicationsNamespace
-	// }
-
-	//// If modelmesh is deployed successfully, deploy modelmesh-monitoring
-	// err = deploy.DeployManifestsFromPath(cli, owner, monitoringPath, monitoringNamespace, ComponentName, enabled)
 
 	return err
 }

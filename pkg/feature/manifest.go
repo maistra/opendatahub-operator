@@ -14,6 +14,7 @@ const (
 	BaseDir         = "templates/servicemesh/"
 	ControlPlaneDir = BaseDir + "control-plane"
 	AuthDir         = BaseDir + "authorino"
+	KServeDir       = BaseDir + "kserve"
 	BaseOutputDir   = "/tmp/servicemesh-manifests/"
 )
 

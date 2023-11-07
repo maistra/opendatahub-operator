@@ -3,6 +3,7 @@ package kserve
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
 
 var (
@@ -125,7 +128,7 @@ func (k *Kserve) ReconcileComponent(cli client.Client, owner metav1.Object, dsci
 		if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "odh-model-controller"); err != nil {
 			return err
 		}
-		// Update image parameters for odh-maodel-controller
+		// Update image parameters for odh-model-controller
 		if dscispec.DevFlags.ManifestsUri == "" && len(k.DevFlags.Manifests) == 0 {
 			if err := deploy.ApplyParams(DependentPath, k.SetImageParamsMap(dependentParamMap), false); err != nil {
 				return err
@@ -141,10 +144,83 @@ func (k *Kserve) ReconcileComponent(cli client.Client, owner metav1.Object, dsci
 		}
 	}
 
+	if enabled {
+		if err := k.configureServiceMesh(cli, dscispec); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (k *Kserve) Cleanup(cli client.Client, dscispec *dsci.DSCInitializationSpec) error {
+	shouldConfigureServiceMesh, err := deploy.ShouldConfigureServiceMesh(cli, dscispec)
+	if err != nil {
+		return err
+	}
+
+	if shouldConfigureServiceMesh {
+		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, k.defineServiceMeshFeatures(dscispec))
+
+		if err := serviceMeshInitializer.Prepare(); err != nil {
+			return err
+		}
+
+		if err := serviceMeshInitializer.Delete(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (k *Kserve) DeepCopyInto(target *Kserve) {
 	*target = *k
 	target.Component = k.Component
+}
+
+func (k *Kserve) configureServiceMesh(cli client.Client, dscispec *dsci.DSCInitializationSpec) error {
+	shouldConfigureServiceMesh, err := deploy.ShouldConfigureServiceMesh(cli, dscispec)
+	if err != nil {
+		return err
+	}
+
+	if shouldConfigureServiceMesh {
+		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, k.defineServiceMeshFeatures(dscispec))
+
+		if err := serviceMeshInitializer.Prepare(); err != nil {
+			return err
+		}
+
+		if err := serviceMeshInitializer.Apply(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (k *Kserve) defineServiceMeshFeatures(dscispec *dsci.DSCInitializationSpec) feature.DefinedFeatures {
+	return func(s *feature.FeaturesInitializer) error {
+		var rootDir = filepath.Join(feature.BaseOutputDir, dscispec.ApplicationsNamespace)
+		if err := feature.CopyEmbeddedFiles("templates", rootDir); err != nil {
+			return err
+		}
+
+		kserve, err := feature.CreateFeature("configure-kserve-for-external-authz").
+			For(dscispec).
+			Manifests(
+				path.Join(rootDir, feature.KServeDir),
+			).
+			WithData(servicemesh.ClusterDetails).
+			Load()
+
+		if err != nil {
+			return err
+		}
+
+		s.Features = append(s.Features, kserve)
+
+		return nil
+	}
 }

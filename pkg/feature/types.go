@@ -8,6 +8,7 @@ import (
 
 type Spec struct {
 	*v1.ServiceMeshSpec
+	*v1.ServerlessSpec
 	OAuth        OAuth
 	AppNamespace string
 	Domain       string

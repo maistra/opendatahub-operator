@@ -2,7 +2,6 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: controller-manager-role
 rules:
 - apiGroups:
@@ -1036,6 +1035,12 @@ rules:
   - operator.authorino.kuadrant.io
   resources:
   - authorinos
+  verbs:
+  - '*'
+- apiGroups:
+  - operator.knative.dev
+  resources:
+  - knativeservings
   verbs:
   - '*'
 - apiGroups:

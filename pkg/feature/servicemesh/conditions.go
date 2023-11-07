@@ -20,6 +20,16 @@ const (
 	duration = 5 * time.Minute
 )
 
+func EnsureServiceMeshOperatorInstalled(f *feature.Feature) error {
+	if err := feature.EnsureCRDIsInstalled("servicemeshcontrolplanes.maistra.io")(f); err != nil {
+		log.Info("Failed to find the pre-requisite Service Mesh Control Plane CRD, please ensure Service Mesh Operator is installed.", "feature", f.Name)
+
+		return err
+	}
+
+	return nil
+}
+
 func EnsureServiceMeshInstalled(f *feature.Feature) error {
 	if err := feature.EnsureCRDIsInstalled("servicemeshcontrolplanes.maistra.io")(f); err != nil {
 		log.Info("Failed to find the pre-requisite Service Mesh Control Plane CRD, please ensure Service Mesh Operator is installed.", "feature", f.Name)
@@ -40,11 +50,12 @@ func EnsureServiceMeshInstalled(f *feature.Feature) error {
 }
 
 func WaitForControlPlaneToBeReady(feature *feature.Feature) error {
-	return wait.PollUntilContextTimeout(context.TODO(), interval, duration, false, func(ctx context.Context) (bool, error) {
-		smcp := feature.Spec.Mesh.Name
-		smcpNs := feature.Spec.Mesh.Namespace
+	smcp := feature.Spec.Mesh.Name
+	smcpNs := feature.Spec.Mesh.Namespace
 
-		log.Info("waiting for control plane components to be ready", "feature", feature.Name, "control-plane", smcp, "namespace", smcpNs, "duration (s)", duration.Seconds())
+	log.Info("waiting for control plane components to be ready", "feature", feature.Name, "control-plane", smcp, "namespace", smcpNs, "duration (s)", duration.Seconds())
+
+	return wait.PollUntilContextTimeout(context.TODO(), interval, duration, false, func(ctx context.Context) (bool, error) {
 		ready, err := CheckControlPlaneComponentReadiness(feature.DynamicClient, smcp, smcpNs)
 
 		if ready {

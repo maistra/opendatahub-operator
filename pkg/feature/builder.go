@@ -28,6 +28,7 @@ func (fb *featureBuilder) For(spec *v1.DSCInitializationSpec) *featureBuilder {
 		f.Spec = &Spec{
 			AppNamespace:    spec.ApplicationsNamespace,
 			ServiceMeshSpec: &spec.ServiceMesh,
+			ServerlessSpec:  &spec.Serverless,
 		}
 
 		return nil

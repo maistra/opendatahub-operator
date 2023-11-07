@@ -156,6 +156,16 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return reconcile.Result{}, errServiceMesh
 	}
 
+	// Apply Service Mesh configurations
+	if errServiceMesh := r.configureServiceMesh(instance); errServiceMesh != nil {
+		return reconcile.Result{}, errServiceMesh
+	}
+
+	// Apply Serverless configurations
+	if errServerless := r.configureServerless(instance); errServerless != nil {
+		return reconcile.Result{}, errServerless
+	}
+
 	// Finish reconciling
 	_, err = r.updateStatus(ctx, instance, func(saved *dsci.DSCInitialization) {
 		status.SetCompleteCondition(&saved.Status.Conditions, status.ReconcileCompleted, status.ReconcileCompletedMessage)

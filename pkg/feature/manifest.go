@@ -42,6 +42,10 @@ func loadManifestsFrom(embeddedFS embed.FS, rootPath string) ([]manifest, error)
 		}
 
 		_, err = fs.ReadFile(embeddedFS, path)
+		if err != nil {
+			log.Error(err, "Failed to load manifest from", "path", path)
+			return err
+		}
 		m := loadManifestFrom(path)
 		manifests = append(manifests, m)
 
@@ -93,7 +97,7 @@ func (m *manifest) processTemplate(fs embed.FS, data interface{}) error {
 		return err
 	}
 
-	m.processedContent = string(buffer.Bytes())
+	m.processedContent = buffer.String()
 	m.processed = true
 
 	return nil

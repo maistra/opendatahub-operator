@@ -1,9 +1,10 @@
 package dashboard
 
 import (
+	"path"
+
 	operatorv1 "github.com/openshift/api/operator/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
@@ -41,7 +42,6 @@ func (d *Dashboard) configureServiceMesh(cli client.Client, owner metav1.Object,
 
 func (d *Dashboard) defineServiceMeshFeatures(dscispec *dsci.DSCInitializationSpec) feature.DefinedFeatures {
 	return func(s *feature.FeaturesInitializer) error {
-
 		createMeshResources, err := feature.CreateFeature("dashboard-create-service-mesh-routing-resources").
 			For(dscispec).
 			Manifests(

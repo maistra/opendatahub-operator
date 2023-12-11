@@ -1,11 +1,12 @@
 package kserve
 
 import (
+	"path"
+
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/serverless"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/gvr"
-	"path"
 )
 
 const (
@@ -14,7 +15,6 @@ const (
 )
 
 func (k *Kserve) configureServerlessFeatures(s *feature.FeaturesInitializer) error {
-
 	servingDeployment, err := feature.CreateFeature("serverless-serving-deployment").
 		For(s.DSCInitializationSpec).
 		Manifests(

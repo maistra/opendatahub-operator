@@ -2,10 +2,7 @@ package servicemesh_test
 
 import (
 	"context"
-	"io"
-	"os"
 	"path"
-	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -490,43 +487,4 @@ func getNamespace(namespace string) (*v1.Namespace, error) {
 	err := envTestClient.Get(context.Background(), types.NamespacedName{Name: namespace}, ns)
 
 	return ns, err
-}
-
-func fromTestTmpDir(fileName string) string {
-	root, err := envtestutil.FindProjectRoot()
-	Expect(err).ToNot(HaveOccurred())
-
-	tmpDir := filepath.Join(os.TempDir(), envtestutil.RandomUUIDName(16))
-	if err := os.Mkdir(tmpDir, os.ModePerm); err != nil {
-		Fail(err.Error())
-	}
-
-	src := path.Join(root, "pkg", "feature", fileName)
-	dest := path.Join(tmpDir, fileName)
-	if err := copyFile(src, dest); err != nil {
-		Fail(err.Error())
-	}
-
-	return dest
-}
-
-func copyFile(src, dst string) error {
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	if err := os.MkdirAll(filepath.Dir(dst), os.ModePerm); err != nil {
-		return err
-	}
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-
-	_, err = io.Copy(destination, source)
-	return err
 }

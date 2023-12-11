@@ -1,17 +1,16 @@
 package dscinitialization
 
 import (
+	"path"
+
+	operatorv1 "github.com/openshift/api/operator/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	corev1 "k8s.io/api/core/v1"
-	"path"
-	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-var log = ctrlLog.Log.WithName("SM Setup")
 
 func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 	serviceMeshSpec := f.ServiceMesh

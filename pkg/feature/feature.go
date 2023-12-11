@@ -2,8 +2,6 @@ package feature
 
 import (
 	"context"
-	"time"
-
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -44,12 +42,6 @@ type Feature struct {
 type Action func(feature *Feature) error
 
 func (f *Feature) Apply() error {
-
-	startTime := time.Now() // Capture start time
-	defer func() {
-		log.Info("Apply function execution time", "feature", f.Name, "duration", time.Since(startTime))
-	}()
-
 	if !f.Enabled {
 		log.Info("feature is disabled, skipping.", "feature", f.Name)
 

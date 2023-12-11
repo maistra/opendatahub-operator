@@ -301,7 +301,7 @@ var _ = Describe("Cleanup operations", func() {
 
 			controlPlaneWithSecretVolumes, err := feature.CreateFeature("control-plane-with-secret-volumes").
 				For(dsciSpec).
-				Manifests(fromTestTmpDir(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl"))).
+				Manifests(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl")).
 				UsingConfig(envTest.Config).
 				Load()
 
@@ -335,7 +335,7 @@ var _ = Describe("Cleanup operations", func() {
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("control-plane-with-external-authz-provider").
 				For(dsciSpec).
-				Manifests(fromTestTmpDir(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"))).
+				Manifests(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl")).
 				UsingConfig(envTest.Config).
 				Load()
 

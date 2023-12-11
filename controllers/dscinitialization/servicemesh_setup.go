@@ -1,11 +1,11 @@
 package dscinitialization
 
 import (
-	"path"
-	"path/filepath"
-
 	operatorv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
+	"path"
+	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
@@ -13,18 +13,20 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
 
-func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
-	var rootDir = filepath.Join(feature.BaseOutputDir, f.DSCInitializationSpec.ApplicationsNamespace)
-	if err := feature.CopyEmbeddedFiles("templates", rootDir); err != nil {
-		return err
-	}
+var log = ctrlLog.Log.WithName("SM Setup")
 
+func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 	serviceMeshSpec := f.ServiceMesh
+
+	startTime := time.Now() // Capture start time
+	defer func() {
+		log.Info("defineServiceMeshFeatures execution time", "duration", time.Since(startTime))
+	}()
 
 	smcpCreation, errSmcp := feature.CreateFeature("service-mesh-control-plane-creation").
 		For(f.DSCInitializationSpec).
 		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "base", "control-plane.tmpl"),
+			path.Join(feature.ControlPlaneDir, "base", "control-plane.tmpl"),
 		).
 		PreConditions(
 			servicemesh.EnsureServiceMeshOperatorInstalled,
@@ -43,7 +45,7 @@ func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 		metricsCollection, errMetrics := feature.CreateFeature("service-mesh-monitoring").
 			For(f.DSCInitializationSpec).
 			Manifests(
-				path.Join(rootDir, feature.MonitoringDir),
+				path.Join(feature.MonitoringDir),
 			).
 			PreConditions(
 				servicemesh.EnsureServiceMeshInstalled,
@@ -59,9 +61,9 @@ func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 	if oauth, err := feature.CreateFeature("service-mesh-control-plane-configure-oauth").
 		For(f.DSCInitializationSpec).
 		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "base"),
-			path.Join(rootDir, feature.ControlPlaneDir, "oauth"),
-			path.Join(rootDir, feature.ControlPlaneDir, "filters"),
+			path.Join(feature.ControlPlaneDir, "base"),
+			path.Join(feature.ControlPlaneDir, "oauth"),
+			path.Join(feature.ControlPlaneDir, "filters"),
 		).
 		WithResources(
 			servicemesh.DefaultValues,
@@ -96,8 +98,8 @@ func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 	if serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
 		For(f.DSCInitializationSpec).
 		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "smm.tmpl"),
-			path.Join(rootDir, feature.ControlPlaneDir, "namespace.patch.tmpl"),
+			path.Join(feature.ControlPlaneDir, "smm.tmpl"),
+			path.Join(feature.ControlPlaneDir, "namespace.patch.tmpl"),
 		).
 		WithData(servicemesh.ClusterDetails).
 		Load(); err != nil {
@@ -109,7 +111,7 @@ func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 	if gatewayRoute, err := feature.CreateFeature("service-mesh-create-gateway-route").
 		For(f.DSCInitializationSpec).
 		Manifests(
-			path.Join(rootDir, feature.ControlPlaneDir, "routing"),
+			path.Join(feature.ControlPlaneDir, "routing"),
 		).
 		WithData(servicemesh.ClusterDetails).
 		PostConditions(
@@ -133,10 +135,10 @@ func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 	if extAuthz, err := feature.CreateFeature("service-mesh-control-plane-setup-external-authorization").
 		For(f.DSCInitializationSpec).
 		Manifests(
-			path.Join(rootDir, feature.AuthDir, "auth-smm.tmpl"),
-			path.Join(rootDir, feature.AuthDir, "base"),
-			path.Join(rootDir, feature.AuthDir, "rbac"),
-			path.Join(rootDir, feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
+			path.Join(feature.AuthDir, "auth-smm.tmpl"),
+			path.Join(feature.AuthDir, "base"),
+			path.Join(feature.AuthDir, "rbac"),
+			path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
 		).
 		WithData(servicemesh.ClusterDetails).
 		PreConditions(
@@ -153,7 +155,7 @@ func defineServiceMeshFeatures(f *feature.FeaturesInitializer) error {
 				//
 				// To make it part of Service Mesh we have to patch it with injection
 				// enabled instead, otherwise it will not have proxy pod injected.
-				return f.ApplyManifest(path.Join(rootDir, feature.AuthDir, "deployment.injection.patch.tmpl"))
+				return f.ApplyManifest(path.Join(feature.AuthDir, "deployment.injection.patch.tmpl"))
 			},
 		).
 		OnDelete(servicemesh.RemoveExtensionProvider).

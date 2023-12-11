@@ -1,14 +1,17 @@
 package feature
 
 import (
+	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
+
+//go:embed templates
+var embeddedFiles embed.FS
 
 const (
 	BaseDir         = "templates/servicemesh/"
@@ -24,23 +27,33 @@ type manifest struct {
 	template,
 	patch,
 	processed bool
+	processedContent string
 }
 
-func loadManifestsFrom(path string) ([]manifest, error) {
+func loadManifestsFrom(embeddedFS embed.FS, rootPath string) ([]manifest, error) {
 	var manifests []manifest
-	if err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+
+	// Walk through the embedded file system starting from the specified root path
+	err := fs.WalkDir(embeddedFS, rootPath, func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+
+		// Skip directories
+		if dirEntry.IsDir() {
 			return nil
 		}
+
+		// Construct the manifest object from the path
+		_, err = fs.ReadFile(embeddedFS, path)
 		m := loadManifestFrom(path)
 		manifests = append(manifests, m)
 
 		return nil
-	}); err != nil {
-		return nil, errors.WithStack(err)
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return manifests, nil
@@ -62,28 +75,30 @@ func (m *manifest) targetPath() string {
 	return fmt.Sprintf("%s%s", m.path[:len(m.path)-len(filepath.Ext(m.path))], ".yaml")
 }
 
-func (m *manifest) processTemplate(data interface{}) error {
+func (m *manifest) processTemplate(fs embed.FS, data interface{}) error {
 	if !m.template {
 		return nil
 	}
-	path := m.targetPath()
 
-	f, err := os.Create(path)
+	templateContent, err := fs.ReadFile(m.path)
 	if err != nil {
-		log.Error(err, "Failed to create file")
-
+		log.Error(err, "Failed to read template file", "path", m.path)
 		return err
 	}
 
-	tmpl := template.New(m.name).Funcs(template.FuncMap{"ReplaceChar": ReplaceChar})
-
-	tmpl, err = tmpl.ParseFiles(m.path)
+	tmpl, err := template.New(m.name).Funcs(template.FuncMap{"ReplaceChar": ReplaceChar}).Parse(string(templateContent))
 	if err != nil {
+		log.Error(err, "Failed to template for file", "path", m.path)
 		return err
 	}
 
-	err = tmpl.Execute(f, data)
-	m.processed = err == nil
+	var buffer bytes.Buffer
+	if err := tmpl.Execute(&buffer, data); err != nil {
+		return err
+	}
 
-	return err
+	m.processedContent = string(buffer.Bytes()) // Save processed content in manifest struct
+	m.processed = true
+
+	return nil
 }

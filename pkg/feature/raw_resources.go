@@ -16,7 +16,6 @@ package feature
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
@@ -33,13 +32,9 @@ const (
 	YamlSeparator = "(?m)^---[ \t]*$"
 )
 
-func (f *Feature) createResourceFromFile(filename string) error {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+func (f *Feature) createResourceFromData(data string) error {
 	splitter := regexp.MustCompile(YamlSeparator)
-	objectStrings := splitter.Split(string(data), -1)
+	objectStrings := splitter.Split(data, -1)
 	for _, str := range objectStrings {
 		if strings.TrimSpace(str) == "" {
 			continue
@@ -79,13 +74,9 @@ func (f *Feature) createResourceFromFile(filename string) error {
 	return nil
 }
 
-func (f *Feature) patchResourceFromFile(filename string) error {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+func (f *Feature) patchResourceFromData(data string) error {
 	splitter := regexp.MustCompile(YamlSeparator)
-	objectStrings := splitter.Split(string(data), -1)
+	objectStrings := splitter.Split(data, -1)
 	for _, str := range objectStrings {
 		if strings.TrimSpace(str) == "" {
 			continue
@@ -106,7 +97,7 @@ func (f *Feature) patchResourceFromFile(filename string) error {
 		}
 
 		// Convert the patch from YAML to JSON
-		patchAsJSON, err := yaml.YAMLToJSON(data)
+		patchAsJSON, err := yaml.YAMLToJSON([]byte(data))
 		if err != nil {
 			log.Error(err, "error converting yaml to json")
 

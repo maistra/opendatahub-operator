@@ -79,7 +79,7 @@ func (fb *featureBuilder) Manifests(paths ...string) *featureBuilder {
 		var manifests []manifest
 
 		for _, path := range paths {
-			manifests, err = loadManifestsFrom(path)
+			manifests, err = loadManifestsFrom(embeddedFiles, path)
 			if err != nil {
 				return errors.WithStack(err)
 			}

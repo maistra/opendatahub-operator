@@ -1,14 +1,13 @@
 package feature
 
 import (
-	"embed"
 	"io/fs"
 	"os"
 	"path/filepath"
 )
 
-//go:embed templates
-var embeddedFiles embed.FS
+////go:embed templates
+//var embeddedFiles embed.FS
 
 // CopyEmbeddedFiles ensures that files embedded using go:embed are populated
 // to dest directory. In order to process the templates, we need to create a tmp directory

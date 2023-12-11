@@ -18,7 +18,6 @@ const (
 	ControlPlaneDir = BaseDir + "control-plane"
 	AuthDir         = BaseDir + "authorino"
 	MonitoringDir   = BaseDir + "monitoring"
-	BaseOutputDir   = "/tmp/opendatahub-manifests/"
 )
 
 type manifest struct {
@@ -33,18 +32,15 @@ type manifest struct {
 func loadManifestsFrom(embeddedFS embed.FS, rootPath string) ([]manifest, error) {
 	var manifests []manifest
 
-	// Walk through the embedded file system starting from the specified root path
 	err := fs.WalkDir(embeddedFS, rootPath, func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Skip directories
 		if dirEntry.IsDir() {
 			return nil
 		}
 
-		// Construct the manifest object from the path
 		_, err = fs.ReadFile(embeddedFS, path)
 		m := loadManifestFrom(path)
 		manifests = append(manifests, m)
@@ -97,7 +93,7 @@ func (m *manifest) processTemplate(fs embed.FS, data interface{}) error {
 		return err
 	}
 
-	m.processedContent = string(buffer.Bytes()) // Save processed content in manifest struct
+	m.processedContent = string(buffer.Bytes())
 	m.processed = true
 
 	return nil

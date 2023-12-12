@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -29,10 +30,10 @@ type manifest struct {
 	processedContent string
 }
 
-func loadManifestsFrom(embeddedFS embed.FS, rootPath string) ([]manifest, error) {
+func loadManifestsFrom(fsys fs.FS, rootPath string) ([]manifest, error) {
 	var manifests []manifest
 
-	err := fs.WalkDir(embeddedFS, rootPath, func(path string, dirEntry fs.DirEntry, err error) error {
+	err := fs.WalkDir(fsys, rootPath, func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -41,7 +42,7 @@ func loadManifestsFrom(embeddedFS embed.FS, rootPath string) ([]manifest, error)
 			return nil
 		}
 
-		_, err = fs.ReadFile(embeddedFS, path)
+		_, err = fs.ReadFile(fsys, path)
 		if err != nil {
 			log.Error(err, "Failed to load manifest from", "path", path)
 			return err
@@ -75,12 +76,19 @@ func (m *manifest) targetPath() string {
 	return fmt.Sprintf("%s%s", m.path[:len(m.path)-len(filepath.Ext(m.path))], ".yaml")
 }
 
-func (m *manifest) processTemplate(fs embed.FS, data interface{}) error {
+func (m *manifest) processTemplate(fsys fs.FS, data interface{}) error {
 	if !m.template {
 		return nil
 	}
 
-	templateContent, err := fs.ReadFile(m.path)
+	templateFile, err := fsys.Open(m.path)
+	if err != nil {
+		log.Error(err, "Failed to open template file", "path", m.path)
+		return err
+	}
+	defer templateFile.Close()
+
+	templateContent, err := io.ReadAll(templateFile)
 	if err != nil {
 		log.Error(err, "Failed to read template file", "path", m.path)
 		return err

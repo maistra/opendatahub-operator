@@ -176,13 +176,13 @@ func (f *Feature) apply(m manifest) error {
 		applier = func(data string) error {
 			log.Info("patching using manifest", "feature", f.Name, "name", m.name, "path", targetPath)
 
-			return f.patchResourceFromData(data)
+			return f.patchResources(data)
 		}
 	} else {
 		applier = func(data string) error {
 			log.Info("applying manifest", "feature", f.Name, "name", m.name, "path", targetPath)
 
-			return f.createResourceFromData(data)
+			return f.createResources(data)
 		}
 	}
 

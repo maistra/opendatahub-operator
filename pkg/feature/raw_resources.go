@@ -31,7 +31,7 @@ const (
 	YamlSeparator = "(?m)^---[ \t]*$"
 )
 
-func (f *Feature) createResourceFromData(resources string) error {
+func (f *Feature) createResources(resources string) error {
 	splitter := regexp.MustCompile(YamlSeparator)
 	objectStrings := splitter.Split(resources, -1)
 	for _, str := range objectStrings {
@@ -73,7 +73,7 @@ func (f *Feature) createResourceFromData(resources string) error {
 	return nil
 }
 
-func (f *Feature) patchResourceFromData(resources string) error {
+func (f *Feature) patchResources(resources string) error {
 	splitter := regexp.MustCompile(YamlSeparator)
 	objectStrings := splitter.Split(resources, -1)
 	for _, str := range objectStrings {

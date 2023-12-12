@@ -15,7 +15,6 @@ package feature
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -32,9 +31,9 @@ const (
 	YamlSeparator = "(?m)^---[ \t]*$"
 )
 
-func (f *Feature) createResourceFromData(data string) error {
+func (f *Feature) createResourceFromData(resources string) error {
 	splitter := regexp.MustCompile(YamlSeparator)
-	objectStrings := splitter.Split(data, -1)
+	objectStrings := splitter.Split(resources, -1)
 	for _, str := range objectStrings {
 		if strings.TrimSpace(str) == "" {
 			continue
@@ -74,9 +73,9 @@ func (f *Feature) createResourceFromData(data string) error {
 	return nil
 }
 
-func (f *Feature) patchResourceFromData(data string) error {
+func (f *Feature) patchResourceFromData(resources string) error {
 	splitter := regexp.MustCompile(YamlSeparator)
-	objectStrings := splitter.Split(data, -1)
+	objectStrings := splitter.Split(resources, -1)
 	for _, str := range objectStrings {
 		if strings.TrimSpace(str) == "" {
 			continue
@@ -97,7 +96,7 @@ func (f *Feature) patchResourceFromData(data string) error {
 		}
 
 		// Convert the patch from YAML to JSON
-		patchAsJSON, err := yaml.YAMLToJSON([]byte(data))
+		patchAsJSON, err := yaml.YAMLToJSON([]byte(resources))
 		if err != nil {
 			log.Error(err, "error converting yaml to json")
 
@@ -107,14 +106,6 @@ func (f *Feature) patchResourceFromData(data string) error {
 		_, err = f.DynamicClient.Resource(gvr).
 			Namespace(u.GetNamespace()).
 			Patch(context.TODO(), u.GetName(), k8stypes.MergePatchType, patchAsJSON, metav1.PatchOptions{})
-		if err != nil {
-			log.Error(err, "error patching resource",
-				"gvr", fmt.Sprintf("%+v\n", gvr),
-				"patch", fmt.Sprintf("%+v\n", u),
-				"json", fmt.Sprintf("%+v\n", patchAsJSON))
-
-			return errors.WithStack(err)
-		}
 
 		if err != nil {
 			return errors.WithStack(err)

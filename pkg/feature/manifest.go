@@ -24,9 +24,8 @@ const (
 type manifest struct {
 	name,
 	path string
-	template,
-	patch,
-	processed bool
+	template         bool
+	patch            bool
 	processedContent string
 }
 
@@ -106,7 +105,6 @@ func (m *manifest) processTemplate(fsys fs.FS, data interface{}) error {
 	}
 
 	m.processedContent = buffer.String()
-	m.processed = true
 
 	return nil
 }

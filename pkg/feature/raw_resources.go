@@ -83,7 +83,6 @@ func (f *Feature) patchResources(resources string) error {
 		u := &unstructured.Unstructured{}
 		if err := yaml.Unmarshal([]byte(str), u); err != nil {
 			log.Error(err, "error unmarshalling yaml")
-
 			return errors.WithStack(err)
 		}
 
@@ -95,11 +94,10 @@ func (f *Feature) patchResources(resources string) error {
 			Resource: strings.ToLower(u.GroupVersionKind().Kind) + "s",
 		}
 
-		// Convert the patch from YAML to JSON
-		patchAsJSON, err := yaml.YAMLToJSON([]byte(resources))
+		// Convert the individual resource patch from YAML to JSON
+		patchAsJSON, err := yaml.YAMLToJSON([]byte(str))
 		if err != nil {
 			log.Error(err, "error converting yaml to json")
-
 			return errors.WithStack(err)
 		}
 

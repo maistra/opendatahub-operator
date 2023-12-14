@@ -20,7 +20,6 @@ type partialBuilder func(f *Feature) error
 type featureBuilder struct {
 	name     string
 	builders []partialBuilder
-	fsys     fs.FS
 }
 
 func CreateFeature(name string) *featureBuilder {
@@ -77,11 +76,6 @@ func createClients(config *rest.Config) partialBuilder {
 }
 
 func (fb *featureBuilder) Manifests(paths ...string) *featureBuilder {
-	fsys := fb.fsys
-	if fsys == nil {
-		fsys = embeddedFiles
-	}
-
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		var err error
 		var manifests []manifest
@@ -164,6 +158,7 @@ func (fb *featureBuilder) Load() (*Feature, error) {
 	feature := &Feature{
 		Name:    fb.name,
 		Enabled: true,
+		fsys:    embeddedFiles,
 	}
 
 	for i := range fb.builders {

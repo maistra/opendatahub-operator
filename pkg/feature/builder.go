@@ -87,7 +87,7 @@ func (fb *featureBuilder) Manifests(paths ...string) *featureBuilder {
 		var manifests []manifest
 
 		for _, path := range paths {
-			manifests, err = loadManifestsFrom(fsys, path)
+			manifests, err = loadManifestsFrom(f.fsys, path)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -197,6 +197,11 @@ func (fb *featureBuilder) Load() (*Feature, error) {
 // ManifestSource sets the root file system (fs.FS) from which manifest paths are loaded
 // If ManifestSource is not called in the builder chain, the default source will be the embeddedFiles.
 func (fb *featureBuilder) ManifestSource(fsys fs.FS) *featureBuilder {
-	fb.fsys = fsys
+	fb.builders = append(fb.builders, func(f *Feature) error {
+		f.fsys = fsys
+
+		return nil
+	})
+
 	return fb
 }

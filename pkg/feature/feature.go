@@ -78,7 +78,7 @@ func (f *Feature) Apply() error {
 
 	// Process and apply manifests
 	for i, m := range f.manifests {
-		if err := m.processTemplate(embeddedFiles, f.Spec); err != nil {
+		if err := m.processTemplate(f.fsys, f.Spec); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -161,7 +161,7 @@ func (f *Feature) addCleanup(cleanupFuncs ...Action) {
 
 func (f *Feature) ApplyManifest(filename string) error {
 	m := loadManifestFrom(filename)
-	if err := m.processTemplate(embeddedFiles, f.Spec); err != nil {
+	if err := m.processTemplate(f.fsys, f.Spec); err != nil {
 		return err
 	}
 

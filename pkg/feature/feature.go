@@ -2,6 +2,7 @@ package feature
 
 import (
 	"context"
+	"io/fs"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -37,6 +38,7 @@ type Feature struct {
 	preconditions  []Action
 	postconditions []Action
 	loaders        []Action
+	fsys           fs.FS
 }
 
 // Action is a func type which can be used for different purposes while having access to Feature struct.

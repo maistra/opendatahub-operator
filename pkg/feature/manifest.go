@@ -34,6 +34,7 @@ func loadManifestsFrom(fsys fs.FS, rootPath string) ([]manifest, error) {
 
 	err := fs.WalkDir(fsys, rootPath, func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
+			log.Error(err, "Failed to walk path", "path", path)
 			return err
 		}
 

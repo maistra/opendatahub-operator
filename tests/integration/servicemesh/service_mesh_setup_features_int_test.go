@@ -2,6 +2,7 @@ package servicemesh_test
 
 import (
 	"context"
+	"embed"
 	"path"
 	"time"
 
@@ -23,6 +24,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+//go:embed test-templates
+var testEmbeddedFiles embed.FS
 
 const (
 	timeout  = 5 * time.Second
@@ -369,6 +373,68 @@ var _ = Describe("Cleanup operations", func() {
 
 	})
 
+})
+
+var _ = Describe("Alternate Manifest source", func() {
+
+	Context("using a non-default manifest source", func() {
+
+		var (
+			objectCleaner   *envtestutil.Cleaner
+			dsciSpec        *dscv1.DSCInitializationSpec
+			serviceMeshSpec *infrav1.ServiceMeshSpec
+			namespace       = "test"
+			name            = "minimal"
+		)
+
+		BeforeEach(func() {
+			objectCleaner = envtestutil.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
+
+			dsciSpec = newDSCInitializationSpec(namespace)
+
+			serviceMeshSpec = &dsciSpec.ServiceMesh
+
+			serviceMeshSpec.ControlPlane.Name = name
+			serviceMeshSpec.ControlPlane.Namespace = namespace
+		})
+
+		It("should be able to use different embedded manifests", func() {
+			// given
+			ns := createNamespace(namespace)
+			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+			defer objectCleaner.DeleteAll(ns)
+
+			serviceMeshSpec.Auth.Namespace = "test-provider"
+			serviceMeshSpec.Auth.Authorino.Name = "authorino"
+
+			createServiceMeshControlPlane(name, namespace)
+
+			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("external-manifests-control-plane-with-external-authz-provider").
+				For(dsciSpec).
+				ManifestSource(testEmbeddedFiles).
+				Manifests(path.Join("test-templates", "authorino", "mesh-authz-ext-provider.patch.tmpl")).
+				UsingConfig(envTest.Config).
+				Load()
+
+			Expect(err).ToNot(HaveOccurred())
+
+			// when
+			By("verifying extension provider has been added after applying feature", func() {
+				Expect(controlPlaneWithExtAuthzProvider.Apply()).To(Succeed())
+				serviceMeshControlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
+				Expect(err).ToNot(HaveOccurred())
+
+				extensionProviders, found, err := unstructured.NestedSlice(serviceMeshControlPlane.Object, "spec", "techPreview", "meshConfig", "extensionProviders")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(found).To(BeTrue())
+
+				extensionProvider := extensionProviders[0].(map[string]interface{})
+				Expect(extensionProvider["name"]).To(Equal("test-odh-auth-provider"))
+				Expect(extensionProvider["envoyExtAuthzGrpc"].(map[string]interface{})["service"]).To(Equal("authorino-authorino-authorization.test-provider.svc.cluster.local"))
+			})
+
+		})
+	})
 })
 
 func createServiceMeshControlPlane(name, namespace string) {

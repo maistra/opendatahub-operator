@@ -29,12 +29,11 @@ type manifest struct {
 	processedContent string
 }
 
-func loadManifestsFrom(fsys fs.FS, rootPath string) ([]manifest, error) {
+func loadManifestsFrom(fsys fs.FS, path string) ([]manifest, error) {
 	var manifests []manifest
 
-	err := fs.WalkDir(fsys, rootPath, func(path string, dirEntry fs.DirEntry, err error) error {
+	err := fs.WalkDir(fsys, path, func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
-			log.Error(err, "Failed to walk path", "path", path)
 			return err
 		}
 
@@ -44,7 +43,6 @@ func loadManifestsFrom(fsys fs.FS, rootPath string) ([]manifest, error) {
 
 		_, err = fs.ReadFile(fsys, path)
 		if err != nil {
-			log.Error(err, "Failed to load manifest from", "path", path)
 			return err
 		}
 		m := loadManifestFrom(path)

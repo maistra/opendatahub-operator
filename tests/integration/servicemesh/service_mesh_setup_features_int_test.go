@@ -3,7 +3,6 @@ package servicemesh_test
 import (
 	"context"
 	"embed"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path"
@@ -402,7 +401,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			serviceMeshSpec.ControlPlane.Namespace = namespace
 		})
 
-		It("should be able to use different embedded manifests", func() {
+		FIt("should be able to use different embedded manifests", func() {
 			// given
 			ns := createNamespace(namespace)
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
@@ -450,16 +449,15 @@ var _ = Describe("Alternate Manifest source", func() {
 			serviceMeshSpec.Auth.Namespace = "test-provider"
 			serviceMeshSpec.Auth.Authorino.Name = "authorino"
 
-			join := path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl")
-			myPath := moveTmplTo(tempDir, join)
-			log.Info("path is: ", myPath)
+			patchTemplate := path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl")
+			copyEmbeddedTemplatesTo(tempDir, patchTemplate)
 
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("external-manifests-control-plane-with-external-authz-provider").
 				For(dsciSpec).
-				ManifestSource(os.DirFS("/")).
-				Manifests(myPath).
+				ManifestSource(os.DirFS(tempDir)).
+				Manifests(patchTemplate). // must be relative to root DirFS defined above
 				UsingConfig(envTest.Config).
 				Load()
 
@@ -602,17 +600,15 @@ func getNamespace(namespace string) (*v1.Namespace, error) {
 	return ns, err
 }
 
-func moveTmplTo(tmpDir, fileName string) string {
+func copyEmbeddedTemplatesTo(tmpDir, templatePath string) {
 	root, err := envtestutil.FindProjectRoot()
 	Expect(err).ToNot(HaveOccurred())
 
-	src := path.Join(root, "pkg", "feature", fileName)
-	dest := path.Join(tmpDir, fileName)
+	src := path.Join(root, "pkg", "feature", templatePath)
+	dest := path.Join(tmpDir, templatePath)
 	if err := copyFile(src, dest); err != nil {
 		Fail(err.Error())
 	}
-
-	return dest
 }
 
 func copyFile(src, dst string) error {

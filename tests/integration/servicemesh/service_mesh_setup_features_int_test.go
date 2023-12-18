@@ -3,7 +3,11 @@ package servicemesh_test
 import (
 	"context"
 	"embed"
+	log "github.com/sirupsen/logrus"
+	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -434,6 +438,49 @@ var _ = Describe("Alternate Manifest source", func() {
 			})
 
 		})
+
+		FIt("should be able to use a copied file system", func() {
+			// given
+			tempDir := GinkgoT().TempDir()
+
+			ns := createNamespace(namespace)
+			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
+			defer objectCleaner.DeleteAll(ns)
+
+			serviceMeshSpec.Auth.Namespace = "test-provider"
+			serviceMeshSpec.Auth.Authorino.Name = "authorino"
+
+			join := path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl")
+			myPath := moveTmplTo(tempDir, join)
+			log.Info("path is: ", myPath)
+
+			createServiceMeshControlPlane(name, namespace)
+
+			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("external-manifests-control-plane-with-external-authz-provider").
+				For(dsciSpec).
+				ManifestSource(os.DirFS("/")).
+				Manifests(myPath).
+				UsingConfig(envTest.Config).
+				Load()
+
+			Expect(err).ToNot(HaveOccurred())
+
+			// when
+			By("verifying extension provider has been added after applying feature", func() {
+				Expect(controlPlaneWithExtAuthzProvider.Apply()).To(Succeed())
+				serviceMeshControlPlane, err := getServiceMeshControlPlane(envTest.Config, namespace, name)
+				Expect(err).ToNot(HaveOccurred())
+
+				extensionProviders, found, err := unstructured.NestedSlice(serviceMeshControlPlane.Object, "spec", "techPreview", "meshConfig", "extensionProviders")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(found).To(BeTrue())
+
+				extensionProvider := extensionProviders[0].(map[string]interface{})
+				Expect(extensionProvider["name"]).To(Equal("test-odh-auth-provider"))
+				Expect(extensionProvider["envoyExtAuthzGrpc"].(map[string]interface{})["service"]).To(Equal("authorino-authorino-authorization.test-provider.svc.cluster.local"))
+			})
+
+		})
 	})
 })
 
@@ -553,4 +600,38 @@ func getNamespace(namespace string) (*v1.Namespace, error) {
 	err := envTestClient.Get(context.Background(), types.NamespacedName{Name: namespace}, ns)
 
 	return ns, err
+}
+
+func moveTmplTo(tmpDir, fileName string) string {
+	root, err := envtestutil.FindProjectRoot()
+	Expect(err).ToNot(HaveOccurred())
+
+	src := path.Join(root, "pkg", "feature", fileName)
+	dest := path.Join(tmpDir, fileName)
+	if err := copyFile(src, dest); err != nil {
+		Fail(err.Error())
+	}
+
+	return dest
+}
+
+func copyFile(src, dst string) error {
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), os.ModePerm); err != nil {
+		return err
+	}
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
 }

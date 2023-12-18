@@ -32,8 +32,10 @@ import (
 var testEmbeddedFiles embed.FS
 
 const (
-	timeout  = 5 * time.Second
-	interval = 250 * time.Millisecond
+	timeout            = 5 * time.Second
+	interval           = 250 * time.Millisecond
+	authorinoName      = "authorino"
+	authorinoNamespace = "test-provider"
 )
 
 var _ = Describe("preconditions", func() {
@@ -332,8 +334,8 @@ var _ = Describe("Cleanup operations", func() {
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
 			defer objectCleaner.DeleteAll(ns)
 
-			serviceMeshSpec.Auth.Namespace = "test-provider"
-			serviceMeshSpec.Auth.Authorino.Name = "authorino"
+			serviceMeshSpec.Auth.Namespace = authorinoNamespace
+			serviceMeshSpec.Auth.Authorino.Name = authorinoName
 
 			createServiceMeshControlPlane(name, namespace)
 
@@ -407,8 +409,8 @@ var _ = Describe("Alternate Manifest source", func() {
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
 			defer objectCleaner.DeleteAll(ns)
 
-			serviceMeshSpec.Auth.Namespace = "test-provider"
-			serviceMeshSpec.Auth.Authorino.Name = "authorino"
+			serviceMeshSpec.Auth.Namespace = authorinoNamespace
+			serviceMeshSpec.Auth.Authorino.Name = authorinoName
 
 			createServiceMeshControlPlane(name, namespace)
 
@@ -446,8 +448,8 @@ var _ = Describe("Alternate Manifest source", func() {
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
 			defer objectCleaner.DeleteAll(ns)
 
-			serviceMeshSpec.Auth.Namespace = "test-provider"
-			serviceMeshSpec.Auth.Authorino.Name = "authorino"
+			serviceMeshSpec.Auth.Namespace = authorinoNamespace
+			serviceMeshSpec.Auth.Authorino.Name = authorinoName
 
 			patchTemplate := path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl")
 			copyEmbeddedTemplatesTo(tempDir, patchTemplate)

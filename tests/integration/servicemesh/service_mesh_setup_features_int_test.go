@@ -401,7 +401,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			serviceMeshSpec.ControlPlane.Namespace = namespace
 		})
 
-		FIt("should be able to use different embedded manifests", func() {
+		It("should be able to use different embedded manifests", func() {
 			// given
 			ns := createNamespace(namespace)
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
@@ -438,7 +438,7 @@ var _ = Describe("Alternate Manifest source", func() {
 
 		})
 
-		FIt("should be able to use a copied file system", func() {
+		It("should be able to use a copied file system", func() {
 			// given
 			tempDir := GinkgoT().TempDir()
 

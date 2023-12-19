@@ -403,7 +403,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			serviceMeshSpec.ControlPlane.Namespace = namespace
 		})
 
-		It("should be able to use different embedded manifests", func() {
+		It("should be able to use manifests embedded from different location", func() {
 			// given
 			ns := createNamespace(namespace)
 			Expect(envTestClient.Create(context.Background(), ns)).To(Succeed())
@@ -434,13 +434,13 @@ var _ = Describe("Alternate Manifest source", func() {
 				Expect(found).To(BeTrue())
 
 				extensionProvider := extensionProviders[0].(map[string]interface{})
-				Expect(extensionProvider["name"]).To(Equal("test-odh-auth-provider"))
+				Expect(extensionProvider["name"]).To(Equal("test-odh-different-auth-provider"))
 				Expect(extensionProvider["envoyExtAuthzGrpc"].(map[string]interface{})["service"]).To(Equal("authorino-authorino-authorization.test-provider.svc.cluster.local"))
 			})
 
 		})
 
-		It("should be able to use a copied file system", func() {
+		It("should be able to use an actual file system", func() {
 			// given
 			tempDir := GinkgoT().TempDir()
 

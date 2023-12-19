@@ -602,14 +602,16 @@ func getNamespace(namespace string) (*v1.Namespace, error) {
 	return ns, err
 }
 
-func copyEmbeddedTemplatesTo(tmpDir, templatePath string) {
+func copyEmbeddedTemplatesTo(tmpDir string, templatePaths ...string) {
 	root, err := envtestutil.FindProjectRoot()
 	Expect(err).ToNot(HaveOccurred())
 
-	src := path.Join(root, "pkg", "feature", templatePath)
-	dest := path.Join(tmpDir, templatePath)
-	if err := copyFile(src, dest); err != nil {
-		Fail(err.Error())
+	for _, templatePath := range templatePaths {
+		src := path.Join(root, "pkg", "feature", templatePath)
+		dest := path.Join(tmpDir, templatePath)
+		if err := copyFile(src, dest); err != nil {
+			Fail(err.Error())
+		}
 	}
 }
 

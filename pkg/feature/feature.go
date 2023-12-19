@@ -32,13 +32,14 @@ type Feature struct {
 	DynamicClient dynamic.Interface
 	Client        client.Client
 
-	manifests      []manifest
+	fsys      fs.FS
+	manifests []manifest
+
 	cleanups       []Action
 	resources      []Action
 	preconditions  []Action
 	postconditions []Action
 	loaders        []Action
-	fsys           fs.FS
 }
 
 // Action is a func type which can be used for different purposes while having access to Feature struct.
@@ -69,7 +70,7 @@ func (f *Feature) Apply() error {
 		return multiErr.ErrorOrNil()
 	}
 
-	// create or update resources
+	// Create or update resources
 	for _, resource := range f.resources {
 		if err := resource(f); err != nil {
 			return err
@@ -89,15 +90,12 @@ func (f *Feature) Apply() error {
 		return err
 	}
 
+	// Check all postconditions and collect errors
 	for _, postcondition := range f.postconditions {
 		multiErr = multierror.Append(multiErr, postcondition(f))
 	}
 
-	if multiErr.ErrorOrNil() != nil {
-		return multiErr.ErrorOrNil()
-	}
-
-	return nil
+	return multiErr.ErrorOrNil()
 }
 
 func (f *Feature) Cleanup() error {

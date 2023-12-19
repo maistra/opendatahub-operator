@@ -23,10 +23,10 @@ const (
 
 type manifest struct {
 	name,
-	path string
-	template         bool
-	patch            bool
+	path,
 	processedContent string
+	template,
+	patch bool
 }
 
 func loadManifestsFrom(fsys fs.FS, path string) ([]manifest, error) {

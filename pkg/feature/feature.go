@@ -55,11 +55,13 @@ func (f *Feature) Apply() (err error) {
 
 	var multiErr *multierror.Error
 	var phase string
+	phase = featurev1.ConditionPhaseFeatureCreated
+	f.UpdateFeatureTrackerStatus(conditionsv1.ConditionDegraded, "False", phase, "Processing Feature")
 	defer func() {
 		if err != nil {
 			f.UpdateFeatureTrackerStatus(conditionsv1.ConditionDegraded, "True", phase, err.Error())
 		} else {
-			f.UpdateFeatureTrackerStatus(conditionsv1.ConditionAvailable, "True", phase, "")
+			f.UpdateFeatureTrackerStatus(conditionsv1.ConditionAvailable, "True", phase, "Feature applied successfully")
 		}
 	}()
 
@@ -104,6 +106,9 @@ func (f *Feature) Apply() (err error) {
 	phase = featurev1.ConditionPhasePostCondition
 	for _, postcondition := range f.postconditions {
 		multiErr = multierror.Append(multiErr, postcondition(f))
+	}
+	if multiErr.ErrorOrNil() != nil {
+		return multiErr.ErrorOrNil()
 	}
 
 	phase = featurev1.ConditionPhaseFeatureCreated
@@ -261,7 +266,11 @@ func (f *Feature) createFeatureTracker() error {
 }
 
 func (f *Feature) UpdateFeatureTrackerStatus(condType conditionsv1.ConditionType, status corev1.ConditionStatus, reason, message string) {
-	conditionsv1.SetStatusCondition(&f.Spec.Tracker.Status.Conditions, conditionsv1.Condition{
+	if f.Spec.Tracker.Status.Conditions == nil {
+		f.Spec.Tracker.Status.Conditions = &[]conditionsv1.Condition{}
+	}
+
+	conditionsv1.SetStatusCondition(f.Spec.Tracker.Status.Conditions, conditionsv1.Condition{
 		Type:    condType,
 		Status:  status,
 		Reason:  reason,

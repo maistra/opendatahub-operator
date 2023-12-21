@@ -2,6 +2,7 @@ package features_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
@@ -147,7 +148,7 @@ var _ = Describe("feature trackers", func() {
 			name := "test-resources.openshift.io"
 
 			var err error
-			verificationFeature, err = feature.CreateFeature("CRD verification").
+			verificationFeature, err = feature.CreateFeature("crd-verification").
 				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
@@ -162,9 +163,9 @@ var _ = Describe("feature trackers", func() {
 
 			featureTracker, err := getFeatureTracker("default-crd-verification")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(featureTracker.Status.Conditions).ToNot(BeEmpty())
+			Expect(*featureTracker.Status.Conditions).ToNot(BeEmpty())
 
-			availableCondition := conditionsv1.FindStatusCondition(featureTracker.Status.Conditions, conditionsv1.ConditionAvailable)
+			availableCondition := conditionsv1.FindStatusCondition(*featureTracker.Status.Conditions, conditionsv1.ConditionAvailable)
 			Expect(availableCondition).ToNot(BeNil())
 			Expect(availableCondition.Status).To(Equal(v1.ConditionTrue))
 			Expect(availableCondition.Reason).To(Equal(featurev1.ConditionPhaseFeatureCreated))
@@ -175,7 +176,7 @@ var _ = Describe("feature trackers", func() {
 			name := "non-existing-resource.non-existing-group.io"
 
 			var err error
-			verificationFeature, err = feature.CreateFeature("CRD verification").
+			verificationFeature, err = feature.CreateFeature("crd-verification").
 				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
@@ -190,12 +191,37 @@ var _ = Describe("feature trackers", func() {
 
 			featureTracker, err := getFeatureTracker("default-crd-verification")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(featureTracker.Status.Conditions).ToNot(BeEmpty())
+			Expect(*featureTracker.Status.Conditions).ToNot(BeEmpty())
 
-			degradedCondition := conditionsv1.FindStatusCondition(featureTracker.Status.Conditions, conditionsv1.ConditionDegraded)
+			degradedCondition := conditionsv1.FindStatusCondition(*featureTracker.Status.Conditions, conditionsv1.ConditionDegraded)
 			Expect(degradedCondition).ToNot(BeNil())
 			Expect(degradedCondition.Status).To(Equal(v1.ConditionTrue))
 			Expect(degradedCondition.Reason).To(Equal(featurev1.ConditionPhasePreCondition))
+		})
+
+		It("should indicate failure in post-conditions", func() {
+			var err error
+			verificationFeature, err = feature.CreateFeature("post-condition-failure").
+				For(dsciSpec).
+				UsingConfig(envTest.Config).
+				PostConditions(FailPostCondition()).
+				Load()
+			Expect(err).ToNot(HaveOccurred())
+
+			// when
+			err = verificationFeature.Apply()
+
+			// then
+			Expect(err).To(HaveOccurred())
+
+			featureTracker, err := getFeatureTracker("default-post-condition-failure")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(*featureTracker.Status.Conditions).ToNot(BeEmpty())
+
+			degradedCondition := conditionsv1.FindStatusCondition(*featureTracker.Status.Conditions, conditionsv1.ConditionDegraded)
+			Expect(degradedCondition).ToNot(BeNil())
+			Expect(degradedCondition.Status).To(Equal(v1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(featurev1.ConditionPhasePostCondition))
 		})
 	})
 })
@@ -229,4 +255,10 @@ func getFeatureTracker(name string) (*featurev1.FeatureTracker, error) {
 	}, tracker)
 
 	return tracker, err
+}
+
+func FailPostCondition() feature.Action {
+	return func(f *feature.Feature) error {
+		return fmt.Errorf("dummy error")
+	}
 }

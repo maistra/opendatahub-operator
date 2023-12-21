@@ -47,7 +47,7 @@ type FeatureTrackerSpec struct {
 // FeatureTrackerStatus defines the observed state of FeatureTracker.
 type FeatureTrackerStatus struct {
 	// +optional
-	Conditions []conditionsv1.Condition `json:"conditions"`
+	Conditions *[]conditionsv1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -205,7 +205,7 @@ var _ = Describe("feature trackers", func() {
 				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				PostConditions(func(f *feature.Feature) error {
-					return fmt.Errorf("dummy error")
+					return fmt.Errorf("always fail")
 				}).
 				Load()
 			Expect(err).ToNot(HaveOccurred())

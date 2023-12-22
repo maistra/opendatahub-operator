@@ -113,7 +113,7 @@ func (f *Feature) Apply() (err error) {
 	}
 
 	phase = featurev1.ConditionPhaseFeatureCreated
-	return multiErr.ErrorOrNil()
+	return nil
 }
 
 func (f *Feature) Cleanup() error {

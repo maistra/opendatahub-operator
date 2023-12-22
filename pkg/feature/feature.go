@@ -2,6 +2,7 @@ package feature
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 
 	"github.com/hashicorp/go-multierror"
@@ -56,12 +57,12 @@ func (f *Feature) Apply() (err error) {
 	var multiErr *multierror.Error
 	var phase string
 	phase = featurev1.ConditionPhaseFeatureCreated
-	f.UpdateFeatureTrackerStatus(conditionsv1.ConditionDegraded, "False", phase, "Processing Feature")
+	f.UpdateFeatureTrackerStatus(conditionsv1.ConditionDegraded, "False", phase, fmt.Sprintf("Applying feature %s", f.Name))
 	defer func() {
 		if err != nil {
 			f.UpdateFeatureTrackerStatus(conditionsv1.ConditionDegraded, "True", phase, err.Error())
 		} else {
-			f.UpdateFeatureTrackerStatus(conditionsv1.ConditionAvailable, "True", phase, "Feature applied successfully")
+			f.UpdateFeatureTrackerStatus(conditionsv1.ConditionAvailable, "True", phase, fmt.Sprintf("Feature %s applied successfully", f.Name))
 		}
 	}()
 

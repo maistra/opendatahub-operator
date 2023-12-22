@@ -9,7 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dscv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
@@ -19,6 +19,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/opendatahub-io/opendatahub-operator/v2/tests/assertions"
 )
 
 const (
@@ -135,8 +136,7 @@ var _ = Describe("feature trackers", func() {
 	Context("ensuring feature trackers indicate status and phase", func() {
 
 		var (
-			dsciSpec            *dscv1.DSCInitializationSpec
-			verificationFeature *feature.Feature
+			dsciSpec *dscv1.DSCInitializationSpec
 		)
 
 		BeforeEach(func() {
@@ -146,9 +146,7 @@ var _ = Describe("feature trackers", func() {
 		It("should indicate successful installation in FeatureTracker", func() {
 			// given example CRD installed into env
 			name := "test-resources.openshift.io"
-
-			var err error
-			verificationFeature, err = feature.CreateFeature("crd-verification").
+			verificationFeature, err := feature.CreateFeature("crd-verification").
 				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
@@ -156,27 +154,17 @@ var _ = Describe("feature trackers", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// when
-			err = verificationFeature.Apply()
+			Expect(verificationFeature.Apply()).To(Succeed())
 
 			// then
-			Expect(err).ToNot(HaveOccurred())
-
-			featureTracker, err := getFeatureTracker("default-crd-verification")
-			Expect(err).ToNot(HaveOccurred())
-			Expect(*featureTracker.Status.Conditions).ToNot(BeEmpty())
-
-			availableCondition := conditionsv1.FindStatusCondition(*featureTracker.Status.Conditions, conditionsv1.ConditionAvailable)
-			Expect(availableCondition).ToNot(BeNil())
-			Expect(availableCondition.Status).To(Equal(v1.ConditionTrue))
-			Expect(availableCondition.Reason).To(Equal(featurev1.ConditionPhaseFeatureCreated))
+			featureTracker := getFeatureTracker("default-crd-verification")
+			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionAvailable, v1.ConditionTrue, featurev1.ConditionPhaseFeatureCreated))
 		})
 
 		It("should indicate failure in preconditions", func() {
 			// given
 			name := "non-existing-resource.non-existing-group.io"
-
-			var err error
-			verificationFeature, err = feature.CreateFeature("crd-verification").
+			verificationFeature, err := feature.CreateFeature("crd-verification").
 				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
@@ -184,24 +172,16 @@ var _ = Describe("feature trackers", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// when
-			err = verificationFeature.Apply()
+			Expect(verificationFeature.Apply()).ToNot(Succeed())
 
 			// then
-			Expect(err).To(HaveOccurred())
-
-			featureTracker, err := getFeatureTracker("default-crd-verification")
-			Expect(err).ToNot(HaveOccurred())
-			Expect(*featureTracker.Status.Conditions).ToNot(BeEmpty())
-
-			degradedCondition := conditionsv1.FindStatusCondition(*featureTracker.Status.Conditions, conditionsv1.ConditionDegraded)
-			Expect(degradedCondition).ToNot(BeNil())
-			Expect(degradedCondition.Status).To(Equal(v1.ConditionTrue))
-			Expect(degradedCondition.Reason).To(Equal(featurev1.ConditionPhasePreCondition))
+			featureTracker := getFeatureTracker("default-crd-verification")
+			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionDegraded, v1.ConditionTrue, featurev1.ConditionPhasePreCondition))
 		})
 
 		It("should indicate failure in post-conditions", func() {
-			var err error
-			verificationFeature, err = feature.CreateFeature("post-condition-failure").
+			// given
+			verificationFeature, err := feature.CreateFeature("post-condition-failure").
 				For(dsciSpec).
 				UsingConfig(envTest.Config).
 				PostConditions(func(f *feature.Feature) error {
@@ -211,19 +191,11 @@ var _ = Describe("feature trackers", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// when
-			err = verificationFeature.Apply()
+			Expect(verificationFeature.Apply()).ToNot(Succeed())
 
 			// then
-			Expect(err).To(HaveOccurred())
-
-			featureTracker, err := getFeatureTracker("default-post-condition-failure")
-			Expect(err).ToNot(HaveOccurred())
-			Expect(*featureTracker.Status.Conditions).ToNot(BeEmpty())
-
-			degradedCondition := conditionsv1.FindStatusCondition(*featureTracker.Status.Conditions, conditionsv1.ConditionDegraded)
-			Expect(degradedCondition).ToNot(BeNil())
-			Expect(degradedCondition.Status).To(Equal(v1.ConditionTrue))
-			Expect(degradedCondition.Reason).To(Equal(featurev1.ConditionPhasePostCondition))
+			featureTracker := getFeatureTracker("default-post-condition-failure")
+			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionDegraded, v1.ConditionTrue, featurev1.ConditionPhasePostCondition))
 		})
 	})
 })
@@ -245,16 +217,18 @@ func newDSCInitializationSpec(ns string) *dscv1.DSCInitializationSpec {
 
 func getNamespace(namespace string) (*v1.Namespace, error) {
 	ns := createNamespace(namespace)
-	err := envTestClient.Get(context.Background(), types.NamespacedName{Name: namespace}, ns)
+	err := envTestClient.Get(context.Background(), k8stypes.NamespacedName{Name: namespace}, ns)
 
 	return ns, err
 }
 
-func getFeatureTracker(name string) (*featurev1.FeatureTracker, error) {
+func getFeatureTracker(name string) *featurev1.FeatureTracker {
 	tracker := &featurev1.FeatureTracker{}
 	err := envTestClient.Get(context.Background(), client.ObjectKey{
 		Name: name,
 	}, tracker)
 
-	return tracker, err
+	Expect(err).ToNot(HaveOccurred())
+
+	return tracker
 }

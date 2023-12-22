@@ -204,7 +204,9 @@ var _ = Describe("feature trackers", func() {
 			verificationFeature, err = feature.CreateFeature("post-condition-failure").
 				For(dsciSpec).
 				UsingConfig(envTest.Config).
-				PostConditions(FailPostCondition()).
+				PostConditions(func(f *feature.Feature) error {
+					return fmt.Errorf("dummy error")
+				}).
 				Load()
 			Expect(err).ToNot(HaveOccurred())
 
@@ -255,10 +257,4 @@ func getFeatureTracker(name string) (*featurev1.FeatureTracker, error) {
 	}, tracker)
 
 	return tracker, err
-}
-
-func FailPostCondition() feature.Action {
-	return func(f *feature.Feature) error {
-		return fmt.Errorf("dummy error")
-	}
 }

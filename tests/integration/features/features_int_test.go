@@ -176,7 +176,7 @@ var _ = Describe("feature trackers", func() {
 
 			// then
 			featureTracker := getFeatureTracker("default-crd-verification")
-			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionDegraded, v1.ConditionTrue, featurev1.ConditionPhasePreCondition))
+			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionDegraded, v1.ConditionTrue, featurev1.ConditionPhasePreConditions))
 		})
 
 		It("should indicate failure in post-conditions", func() {
@@ -195,7 +195,7 @@ var _ = Describe("feature trackers", func() {
 
 			// then
 			featureTracker := getFeatureTracker("default-post-condition-failure")
-			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionDegraded, v1.ConditionTrue, featurev1.ConditionPhasePostCondition))
+			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionDegraded, v1.ConditionTrue, featurev1.ConditionPhasePostConditions))
 		})
 	})
 })

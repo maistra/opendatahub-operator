@@ -66,7 +66,7 @@ func (f *Feature) Apply() (err error) {
 		}
 	}()
 
-	phase = featurev1.ConditionPhasePreCondition
+	phase = featurev1.ConditionPhasePreConditions
 	for _, precondition := range f.preconditions {
 		multiErr = multierror.Append(multiErr, precondition(f))
 	}
@@ -104,7 +104,7 @@ func (f *Feature) Apply() (err error) {
 		return err
 	}
 
-	phase = featurev1.ConditionPhasePostCondition
+	phase = featurev1.ConditionPhasePostConditions
 	for _, postcondition := range f.postconditions {
 		multiErr = multierror.Append(multiErr, postcondition(f))
 	}

@@ -22,13 +22,13 @@ type FeatureTracker struct {
 }
 
 const (
-	ConditionPhasePreCondition     = "PreCondition"
+	ConditionPhaseFeatureCreated   = "FeatureCreated"
+	ConditionPhasePreConditions    = "FeaturePreConditions"
 	ConditionPhaseResourceCreation = "ResourceCreation"
-	ConditionPhasePostCondition    = "PostCondition"
 	ConditionPhaseLoadTemplateData = "LoadTemplateData"
 	ConditionPhaseProcessTemplates = "ProcessTemplates"
 	ConditionPhaseApplyManifests   = "ApplyManifests"
-	ConditionPhaseFeatureCreated   = "FeatureCreated"
+	ConditionPhasePostConditions   = "FeaturePostConditions"
 )
 
 func (s *FeatureTracker) ToOwnerReference() metav1.OwnerReference {

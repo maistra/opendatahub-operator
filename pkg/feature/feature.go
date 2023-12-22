@@ -92,12 +92,12 @@ func (f *Feature) Apply() (err error) {
 	phase = featurev1.ConditionPhaseProcessTemplates
 	for i, m := range f.manifests {
 		if err := m.processTemplate(f.fsys, f.Spec); err != nil {
-			return errors.WithStack(err) // TODO: append to multierror or capture error in defer
+			return errors.WithStack(err)
 		}
 
 		f.manifests[i] = m
 	}
-	// TODO: append to multierror or capture error in defer
+
 	phase = featurev1.ConditionPhaseApplyManifests
 	if err := f.applyManifests(); err != nil {
 		return err

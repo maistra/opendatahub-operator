@@ -1,6 +1,7 @@
 package feature
 
 import (
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"io/fs"
 
 	"github.com/pkg/errors"
@@ -26,12 +27,13 @@ func CreateFeature(name string) *featureBuilder {
 	return &featureBuilder{name: name}
 }
 
-func (fb *featureBuilder) For(spec *v1.DSCInitializationSpec) *featureBuilder {
+func (fb *featureBuilder) For(spec *v1.DSCInitializationSpec, origin featurev1.Origin) *featureBuilder {
 	createSpec := func(f *Feature) error {
 		f.Spec = &Spec{
 			AppNamespace:    spec.ApplicationsNamespace,
 			ServiceMeshSpec: &spec.ServiceMesh,
 			Serving:         &infrav1.ServingSpec{},
+			Origin:          &origin,
 		}
 
 		return nil

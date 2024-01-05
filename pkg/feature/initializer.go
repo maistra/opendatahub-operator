@@ -2,6 +2,7 @@ package feature
 
 import (
 	"github.com/hashicorp/go-multierror"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 )
@@ -10,14 +11,16 @@ type FeaturesInitializer struct {
 	*v1.DSCInitializationSpec
 	definedFeatures DefinedFeatures
 	Features        []*Feature
+	Origin          featurev1.Origin
 }
 
 type DefinedFeatures func(featuresInitializer *FeaturesInitializer) error
 
-func NewFeaturesInitializer(spec *v1.DSCInitializationSpec, def DefinedFeatures) *FeaturesInitializer {
+func NewFeaturesInitializer(spec *v1.DSCInitializationSpec, def DefinedFeatures, origin featurev1.Origin) *FeaturesInitializer {
 	return &FeaturesInitializer{
 		DSCInitializationSpec: spec,
 		definedFeatures:       def,
+		Origin:                origin,
 	}
 }
 

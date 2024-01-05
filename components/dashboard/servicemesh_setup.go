@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"path"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -21,7 +22,10 @@ func (d *Dashboard) configureServiceMesh(cli client.Client, owner metav1.Object,
 	}
 
 	if shouldConfigureServiceMesh {
-		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, d.defineServiceMeshFeatures(dscispec))
+		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, d.defineServiceMeshFeatures(dscispec), featurev1.Origin{
+			Type: featurev1.ComponentType,
+			Name: d.GetComponentName(),
+		})
 
 		if err := serviceMeshInitializer.Prepare(); err != nil {
 			return err
@@ -43,7 +47,7 @@ func (d *Dashboard) configureServiceMesh(cli client.Client, owner metav1.Object,
 func (d *Dashboard) defineServiceMeshFeatures(dscispec *dsci.DSCInitializationSpec) feature.DefinedFeatures {
 	return func(s *feature.FeaturesInitializer) error {
 		createMeshResources, err := feature.CreateFeature("dashboard-create-service-mesh-routing-resources").
-			For(dscispec).
+			For(dscispec, s.Origin).
 			Manifests(
 				path.Join(feature.ControlPlaneDir, "components", d.GetComponentName()),
 			).

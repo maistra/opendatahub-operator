@@ -29,6 +29,8 @@ const (
 	ConditionPhaseProcessTemplates = "ProcessTemplates"
 	ConditionPhaseApplyManifests   = "ApplyManifests"
 	ConditionPhasePostConditions   = "FeaturePostConditions"
+	ComponentType                  = "Component"
+	DSCIType                       = "DSCI"
 )
 
 func (s *FeatureTracker) ToOwnerReference() metav1.OwnerReference {
@@ -40,8 +42,16 @@ func (s *FeatureTracker) ToOwnerReference() metav1.OwnerReference {
 	}
 }
 
+// Origin describes the type of object that created the related Feature to this FeatureTracker
+type Origin struct {
+	Type string
+	Name string
+}
+
 // FeatureTrackerSpec defines the desired state of FeatureTracker.
 type FeatureTrackerSpec struct {
+	Origin       Origin
+	AppNamespace string
 }
 
 // FeatureTrackerStatus defines the observed state of FeatureTracker.

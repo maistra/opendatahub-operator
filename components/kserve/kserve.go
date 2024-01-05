@@ -4,6 +4,7 @@ package kserve
 import (
 	"context"
 	"fmt"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"path/filepath"
 	"strings"
 
@@ -185,9 +186,12 @@ func (k *Kserve) configureServerless(instance *dsciv1.DSCInitializationSpec) err
 	case operatorv1.Managed: // standard workflow to create CR
 		switch instance.ServiceMesh.ManagementState {
 		case operatorv1.Unmanaged, operatorv1.Removed:
-			return fmt.Errorf("ServiceMesh is need to set to 'Managaed' in DSCI CR, it is required by KServe serving field")
+			return fmt.Errorf("ServiceMesh is need to set to 'Managed' in DSCI CR, it is required by KServe serving field")
 		}
-		serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures)
+		serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures, featurev1.Origin{
+			Type: featurev1.ComponentType,
+			Name: k.GetComponentName(),
+		})
 
 		if err := serverlessInitializer.Prepare(); err != nil {
 			return err
@@ -201,7 +205,10 @@ func (k *Kserve) configureServerless(instance *dsciv1.DSCInitializationSpec) err
 }
 
 func (k *Kserve) removeServerlessFeatures(instance *dsciv1.DSCInitializationSpec) error {
-	serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures)
+	serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures, featurev1.Origin{
+		Type: featurev1.ComponentType,
+		Name: k.GetComponentName(),
+	})
 
 	if err := serverlessInitializer.Prepare(); err != nil {
 		return err

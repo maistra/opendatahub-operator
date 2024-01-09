@@ -1,7 +1,6 @@
 package feature
 
 import (
-	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"io/fs"
 
 	"github.com/pkg/errors"
@@ -13,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	infrav1 "github.com/opendatahub-io/opendatahub-operator/v2/infrastructure/v1"
 )
 

@@ -44,7 +44,7 @@ var _ = Describe("preconditions", func() {
 			namespace = envtestutil.AppendRandomNameTo(testFeatureName)
 
 			dsciSpec := newDSCInitializationSpec(namespace)
-			origin := newOrigin(featurev1.DSCIType, "default")
+			origin := newOrigin("default")
 			var err error
 			testFeature, err = feature.CreateFeature(testFeatureName).
 				For(dsciSpec, origin).
@@ -90,7 +90,7 @@ var _ = Describe("preconditions", func() {
 
 		BeforeEach(func() {
 			dsciSpec = newDSCInitializationSpec("default")
-			origin = newOrigin(featurev1.DSCIType, "default")
+			origin = newOrigin("default")
 		})
 
 		It("should successfully check for existing CRD", func() {
@@ -145,7 +145,7 @@ var _ = Describe("feature trackers", func() {
 
 		BeforeEach(func() {
 			dsciSpec = newDSCInitializationSpec("default")
-			origin = newOrigin(featurev1.DSCIType, "default")
+			origin = newOrigin("default")
 		})
 
 		It("should indicate successful installation in FeatureTracker", func() {
@@ -251,9 +251,9 @@ func newDSCInitializationSpec(ns string) *dscv1.DSCInitializationSpec {
 	return &spec
 }
 
-func newOrigin(source, name string) featurev1.Origin {
+func newOrigin(name string) featurev1.Origin {
 	origin := featurev1.Origin{
-		Type: source,
+		Type: featurev1.DSCIType,
 		Name: name,
 	}
 	return origin

@@ -2,9 +2,9 @@ package feature
 
 import (
 	"github.com/hashicorp/go-multierror"
-	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 )
 
 type FeaturesInitializer struct {

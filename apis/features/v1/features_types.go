@@ -44,14 +44,14 @@ func (s *FeatureTracker) ToOwnerReference() metav1.OwnerReference {
 
 // Origin describes the type of object that created the related Feature to this FeatureTracker
 type Origin struct {
-	Type string
-	Name string
+	Type string `json:"type"`
+	Name string `json:"name"`
 }
 
 // FeatureTrackerSpec defines the desired state of FeatureTracker.
 type FeatureTrackerSpec struct {
-	Origin       Origin
-	AppNamespace string
+	Origin       Origin `json:"origin,omitempty"`
+	AppNamespace string `json:"appNamespace,omitempty"`
 }
 
 // FeatureTrackerStatus defines the observed state of FeatureTracker.

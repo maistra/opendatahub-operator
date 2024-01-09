@@ -3,6 +3,7 @@ package servicemesh_test
 import (
 	"context"
 	"embed"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"io"
 	"os"
 	"path"
@@ -55,9 +56,10 @@ var _ = Describe("preconditions", func() {
 			namespace = envtestutil.AppendRandomNameTo(testFeatureName)
 
 			dsciSpec := newDSCInitializationSpec(namespace)
+			origin := newOrigin(featurev1.DSCIType, "default")
 			var err error
 			testFeature, err = feature.CreateFeature(testFeatureName).
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				Load()
 			Expect(err).ToNot(HaveOccurred())
@@ -95,10 +97,12 @@ var _ = Describe("preconditions", func() {
 		var (
 			dsciSpec            *dscv1.DSCInitializationSpec
 			verificationFeature *feature.Feature
+			origin              featurev1.Origin
 		)
 
 		BeforeEach(func() {
 			dsciSpec = newDSCInitializationSpec("default")
+			origin = newOrigin(featurev1.DSCIType, "default")
 		})
 
 		It("should successfully check for existing CRD", func() {
@@ -107,7 +111,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -126,7 +130,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -150,6 +154,7 @@ var _ = Describe("Ensuring service mesh is set up correctly", func() {
 		dsciSpec         *dscv1.DSCInitializationSpec
 		serviceMeshSpec  *infrav1.ServiceMeshSpec
 		serviceMeshCheck *feature.Feature
+		origin           featurev1.Origin
 		name             = "test-name"
 		namespace        = "test-namespace"
 	)
@@ -161,9 +166,9 @@ var _ = Describe("Ensuring service mesh is set up correctly", func() {
 
 		serviceMeshSpec.ControlPlane.Name = name
 		serviceMeshSpec.ControlPlane.Namespace = namespace
-
+		origin = newOrigin(featurev1.DSCIType, "default")
 		serviceMeshCheck, err = feature.CreateFeature("datascience-project-migration").
-			For(dsciSpec).
+			For(dsciSpec, &origin).
 			UsingConfig(envTest.Config).
 			PreConditions(servicemesh.EnsureServiceMeshInstalled).Load()
 
@@ -198,16 +203,18 @@ var _ = Describe("Data Science Project Migration", func() {
 		objectCleaner    *envtestutil.Cleaner
 		dsciSpec         *dscv1.DSCInitializationSpec
 		migrationFeature *feature.Feature
+		origin           featurev1.Origin
 	)
 
 	BeforeEach(func() {
 		objectCleaner = envtestutil.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
 		dsciSpec = newDSCInitializationSpec("default")
+		origin = newOrigin(featurev1.DSCIType, "default")
 
 		var err error
 		migrationFeature, err = feature.CreateFeature("datascience-project-migration").
-			For(dsciSpec).
+			For(dsciSpec, &origin).
 			UsingConfig(envTest.Config).
 			WithResources(servicemesh.MigratedDataScienceProjects).Load()
 
@@ -282,6 +289,7 @@ var _ = Describe("Cleanup operations", func() {
 			objectCleaner   *envtestutil.Cleaner
 			dsciSpec        *dscv1.DSCInitializationSpec
 			serviceMeshSpec *infrav1.ServiceMeshSpec
+			origin          featurev1.Origin
 			namespace       = "test"
 			name            = "minimal"
 		)
@@ -290,6 +298,7 @@ var _ = Describe("Cleanup operations", func() {
 			objectCleaner = envtestutil.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
 			dsciSpec = newDSCInitializationSpec(namespace)
+			origin = newOrigin(featurev1.DSCIType, "default")
 
 			serviceMeshSpec = &dsciSpec.ServiceMesh
 
@@ -306,7 +315,7 @@ var _ = Describe("Cleanup operations", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithSecretVolumes, err := feature.CreateFeature("control-plane-with-secret-volumes").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				Manifests(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl")).
 				UsingConfig(envTest.Config).
 				Load()
@@ -340,7 +349,7 @@ var _ = Describe("Cleanup operations", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("control-plane-with-external-authz-provider").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				Manifests(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl")).
 				UsingConfig(envTest.Config).
 				Load()
@@ -388,6 +397,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			objectCleaner   *envtestutil.Cleaner
 			dsciSpec        *dscv1.DSCInitializationSpec
 			serviceMeshSpec *infrav1.ServiceMeshSpec
+			origin          featurev1.Origin
 			namespace       = "test"
 			name            = "minimal"
 		)
@@ -396,6 +406,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			objectCleaner = envtestutil.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
 			dsciSpec = newDSCInitializationSpec(namespace)
+			origin = newOrigin(featurev1.DSCIType, "default")
 
 			serviceMeshSpec = &dsciSpec.ServiceMesh
 
@@ -415,7 +426,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("external-manifests-control-plane-with-external-authz-provider").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				ManifestSource(testEmbeddedFiles).
 				Manifests(path.Join("test-templates", "authorino", "mesh-authz-ext-provider.patch.tmpl")).
 				UsingConfig(envTest.Config).
@@ -457,7 +468,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("external-manifests-control-plane-with-external-authz-provider").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				ManifestSource(os.DirFS(tempDir)).
 				Manifests(patchTemplate). // must be relative to root DirFS defined above
 				UsingConfig(envTest.Config).
@@ -533,6 +544,14 @@ func newDSCInitializationSpec(ns string) *dscv1.DSCInitializationSpec {
 	spec := dscv1.DSCInitializationSpec{}
 	spec.ApplicationsNamespace = ns
 	return &spec
+}
+
+func newOrigin(source, name string) featurev1.Origin {
+	origin := featurev1.Origin{
+		Type: source,
+		Name: name,
+	}
+	return origin
 }
 
 // createSMCPInCluster uses dynamic client to create a dummy SMCP resource for testing

@@ -2,6 +2,7 @@ package features_test
 
 import (
 	"context"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,8 +78,9 @@ var _ = Describe("Serverless feature", func() {
 		namespace := envtestutil.AppendRandomNameTo(testFeatureName)
 
 		dsciSpec := newDSCInitializationSpec(namespace)
+		origin := newOrigin(featurev1.ComponentType, "kserve")
 		testFeature, err = feature.CreateFeature(testFeatureName).
-			For(dsciSpec).
+			For(dsciSpec, &origin).
 			UsingConfig(envTest.Config).
 			Load()
 

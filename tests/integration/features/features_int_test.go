@@ -44,9 +44,10 @@ var _ = Describe("preconditions", func() {
 			namespace = envtestutil.AppendRandomNameTo(testFeatureName)
 
 			dsciSpec := newDSCInitializationSpec(namespace)
+			origin := newOrigin(featurev1.DSCIType, "default")
 			var err error
 			testFeature, err = feature.CreateFeature(testFeatureName).
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				Load()
 			Expect(err).ToNot(HaveOccurred())
@@ -84,10 +85,12 @@ var _ = Describe("preconditions", func() {
 		var (
 			dsciSpec            *dscv1.DSCInitializationSpec
 			verificationFeature *feature.Feature
+			origin              featurev1.Origin
 		)
 
 		BeforeEach(func() {
 			dsciSpec = newDSCInitializationSpec("default")
+			origin = newOrigin(featurev1.DSCIType, "default")
 		})
 
 		It("should successfully check for existing CRD", func() {
@@ -96,7 +99,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -115,7 +118,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -137,17 +140,19 @@ var _ = Describe("feature trackers", func() {
 
 		var (
 			dsciSpec *dscv1.DSCInitializationSpec
+			origin   featurev1.Origin
 		)
 
 		BeforeEach(func() {
 			dsciSpec = newDSCInitializationSpec("default")
+			origin = newOrigin(featurev1.DSCIType, "default")
 		})
 
 		It("should indicate successful installation in FeatureTracker", func() {
 			// given example CRD installed into env
 			name := "test-resources.openshift.io"
 			verificationFeature, err := feature.CreateFeature("crd-verification").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -165,7 +170,7 @@ var _ = Describe("feature trackers", func() {
 			// given
 			name := "non-existing-resource.non-existing-group.io"
 			verificationFeature, err := feature.CreateFeature("crd-verification").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -182,7 +187,7 @@ var _ = Describe("feature trackers", func() {
 		It("should indicate failure in post-conditions", func() {
 			// given
 			verificationFeature, err := feature.CreateFeature("post-condition-failure").
-				For(dsciSpec).
+				For(dsciSpec, &origin).
 				UsingConfig(envTest.Config).
 				PostConditions(func(f *feature.Feature) error {
 					return fmt.Errorf("always fail")
@@ -213,6 +218,14 @@ func newDSCInitializationSpec(ns string) *dscv1.DSCInitializationSpec {
 	spec.ApplicationsNamespace = ns
 
 	return &spec
+}
+
+func newOrigin(source, name string) featurev1.Origin {
+	origin := featurev1.Origin{
+		Type: source,
+		Name: name,
+	}
+	return origin
 }
 
 func getNamespace(namespace string) (*v1.Namespace, error) {

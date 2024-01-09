@@ -27,13 +27,13 @@ func CreateFeature(name string) *featureBuilder {
 	return &featureBuilder{name: name}
 }
 
-func (fb *featureBuilder) For(spec *v1.DSCInitializationSpec, origin featurev1.Origin) *featureBuilder {
+func (fb *featureBuilder) For(spec *v1.DSCInitializationSpec, origin *featurev1.Origin) *featureBuilder {
 	createSpec := func(f *Feature) error {
 		f.Spec = &Spec{
 			AppNamespace:    spec.ApplicationsNamespace,
 			ServiceMeshSpec: &spec.ServiceMesh,
 			Serving:         &infrav1.ServingSpec{},
-			Origin:          &origin,
+			Origin:          origin,
 		}
 
 		return nil

@@ -47,7 +47,7 @@ func (d *Dashboard) configureServiceMesh(cli client.Client, owner metav1.Object,
 func (d *Dashboard) defineServiceMeshFeatures(dscispec *dsci.DSCInitializationSpec) feature.DefinedFeatures {
 	return func(s *feature.FeaturesInitializer) error {
 		createMeshResources, err := feature.CreateFeature("dashboard-create-service-mesh-routing-resources").
-			For(dscispec, s.Origin).
+			For(dscispec, &s.Origin).
 			Manifests(
 				path.Join(feature.ControlPlaneDir, "components", d.GetComponentName()),
 			).

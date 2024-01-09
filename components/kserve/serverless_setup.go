@@ -16,7 +16,7 @@ const (
 
 func (k *Kserve) configureServerlessFeatures(s *feature.FeaturesInitializer) error {
 	servingDeployment, err := feature.CreateFeature("serverless-serving-deployment").
-		For(s.DSCInitializationSpec, s.Origin).
+		For(s.DSCInitializationSpec, &s.Origin).
 		Manifests(
 			path.Join(templatesDir, "serving-install"),
 		).
@@ -37,7 +37,7 @@ func (k *Kserve) configureServerlessFeatures(s *feature.FeaturesInitializer) err
 	s.Features = append(s.Features, servingDeployment)
 
 	servingIstioGateways, err := feature.CreateFeature("serverless-serving-gateways").
-		For(s.DSCInitializationSpec, s.Origin).
+		For(s.DSCInitializationSpec, &s.Origin).
 		PreConditions(
 			// Check serverless is installed
 			feature.WaitForResourceToBeCreated(knativeServingNamespace, gvr.KnativeServing),

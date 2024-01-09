@@ -5,6 +5,7 @@ package dashboard
 import (
 	"context"
 	"fmt"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"path/filepath"
 	"strings"
 
@@ -217,7 +218,10 @@ func (d *Dashboard) Cleanup(cli client.Client, dscispec *dsciv1.DSCInitializatio
 	}
 
 	if shouldConfigureServiceMesh {
-		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, d.defineServiceMeshFeatures(dscispec))
+		serviceMeshInitializer := feature.NewFeaturesInitializer(dscispec, d.defineServiceMeshFeatures(dscispec), featurev1.Origin{
+			Type: featurev1.ComponentType,
+			Name: d.GetComponentName(),
+		})
 
 		if err := serviceMeshInitializer.Prepare(); err != nil {
 			return err

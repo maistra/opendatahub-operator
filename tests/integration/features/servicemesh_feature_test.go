@@ -80,7 +80,7 @@ var _ = Describe("Service Mesh feature", func() {
 		dsciSpec := newDSCInitializationSpec(namespace)
 		origin := newOrigin(featurev1.DSCIType, "default")
 		testFeature, err = feature.CreateFeature(testFeatureName).
-			For(dsciSpec, &origin).
+			For(dsciSpec, origin).
 			UsingConfig(envTest.Config).
 			Load()
 

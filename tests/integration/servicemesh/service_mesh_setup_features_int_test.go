@@ -59,7 +59,7 @@ var _ = Describe("preconditions", func() {
 			origin := newOrigin(featurev1.DSCIType, "default")
 			var err error
 			testFeature, err = feature.CreateFeature(testFeatureName).
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				Load()
 			Expect(err).ToNot(HaveOccurred())
@@ -111,7 +111,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -130,7 +130,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -168,7 +168,7 @@ var _ = Describe("Ensuring service mesh is set up correctly", func() {
 		serviceMeshSpec.ControlPlane.Namespace = namespace
 		origin = newOrigin(featurev1.DSCIType, "default")
 		serviceMeshCheck, err = feature.CreateFeature("datascience-project-migration").
-			For(dsciSpec, &origin).
+			For(dsciSpec, origin).
 			UsingConfig(envTest.Config).
 			PreConditions(servicemesh.EnsureServiceMeshInstalled).Load()
 
@@ -214,7 +214,7 @@ var _ = Describe("Data Science Project Migration", func() {
 
 		var err error
 		migrationFeature, err = feature.CreateFeature("datascience-project-migration").
-			For(dsciSpec, &origin).
+			For(dsciSpec, origin).
 			UsingConfig(envTest.Config).
 			WithResources(servicemesh.MigratedDataScienceProjects).Load()
 
@@ -315,7 +315,7 @@ var _ = Describe("Cleanup operations", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithSecretVolumes, err := feature.CreateFeature("control-plane-with-secret-volumes").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				Manifests(path.Join(feature.ControlPlaneDir, "base/control-plane-ingress.patch.tmpl")).
 				UsingConfig(envTest.Config).
 				Load()
@@ -349,7 +349,7 @@ var _ = Describe("Cleanup operations", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("control-plane-with-external-authz-provider").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				Manifests(path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl")).
 				UsingConfig(envTest.Config).
 				Load()
@@ -426,7 +426,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("external-manifests-control-plane-with-external-authz-provider").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				ManifestSource(testEmbeddedFiles).
 				Manifests(path.Join("test-templates", "authorino", "mesh-authz-ext-provider.patch.tmpl")).
 				UsingConfig(envTest.Config).
@@ -468,7 +468,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			createServiceMeshControlPlane(name, namespace)
 
 			controlPlaneWithExtAuthzProvider, err := feature.CreateFeature("external-manifests-control-plane-with-external-authz-provider").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				ManifestSource(os.DirFS(tempDir)).
 				Manifests(patchTemplate). // must be relative to root DirFS defined above
 				UsingConfig(envTest.Config).

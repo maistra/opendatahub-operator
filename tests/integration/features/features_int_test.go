@@ -47,7 +47,7 @@ var _ = Describe("preconditions", func() {
 			origin := newOrigin(featurev1.DSCIType, "default")
 			var err error
 			testFeature, err = feature.CreateFeature(testFeatureName).
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				Load()
 			Expect(err).ToNot(HaveOccurred())
@@ -99,7 +99,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -118,7 +118,7 @@ var _ = Describe("preconditions", func() {
 
 			var err error
 			verificationFeature, err = feature.CreateFeature("CRD verification").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -152,7 +152,7 @@ var _ = Describe("feature trackers", func() {
 			// given example CRD installed into env
 			name := "test-resources.openshift.io"
 			verificationFeature, err := feature.CreateFeature("crd-verification").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -170,7 +170,7 @@ var _ = Describe("feature trackers", func() {
 			// given
 			name := "non-existing-resource.non-existing-group.io"
 			verificationFeature, err := feature.CreateFeature("crd-verification").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				PreConditions(feature.EnsureCRDIsInstalled(name)).
 				Load()
@@ -187,7 +187,7 @@ var _ = Describe("feature trackers", func() {
 		It("should indicate failure in post-conditions", func() {
 			// given
 			verificationFeature, err := feature.CreateFeature("post-condition-failure").
-				For(dsciSpec, &origin).
+				For(dsciSpec, origin).
 				UsingConfig(envTest.Config).
 				PostConditions(func(f *feature.Feature) error {
 					return fmt.Errorf("always fail")

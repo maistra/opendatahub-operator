@@ -202,6 +202,37 @@ var _ = Describe("feature trackers", func() {
 			featureTracker := getFeatureTracker("default-post-condition-failure")
 			Expect(featureTracker.Status.Conditions).To(HaveCondition(conditionsv1.ConditionDegraded, v1.ConditionTrue, featurev1.ConditionPhasePostConditions))
 		})
+
+		It("should correctly indicate origin in the feature tracker", func() {
+			verificationFeature, err := feature.CreateFeature("empty-feature").
+				For(dsciSpec, origin).
+				UsingConfig(envTest.Config).
+				Load()
+			Expect(err).ToNot(HaveOccurred())
+
+			// when
+			Expect(verificationFeature.Apply()).To(Succeed())
+
+			// then
+			featureTracker := getFeatureTracker("default-empty-feature")
+			Expect(featureTracker.Spec.Origin.Name).To(Equal("default"))
+			Expect(featureTracker.Spec.Origin.Type).To(Equal(featurev1.DSCIType))
+		})
+
+		It("should correctly indicate app namespace in the feature tracker", func() {
+			verificationFeature, err := feature.CreateFeature("empty-feature").
+				For(dsciSpec, origin).
+				UsingConfig(envTest.Config).
+				Load()
+			Expect(err).ToNot(HaveOccurred())
+
+			// when
+			Expect(verificationFeature.Apply()).To(Succeed())
+
+			// then
+			featureTracker := getFeatureTracker("default-empty-feature")
+			Expect(featureTracker.Spec.AppNamespace).To(Equal("default"))
+		})
 	})
 })
 

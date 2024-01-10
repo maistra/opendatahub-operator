@@ -21,16 +21,18 @@ type FeatureTracker struct {
 	Status            FeatureTrackerStatus `json:"status,omitempty"`
 }
 
+type OwnerType string
+
 const (
-	ConditionPhaseFeatureCreated   = "FeatureCreated"
-	ConditionPhasePreConditions    = "FeaturePreConditions"
-	ConditionPhaseResourceCreation = "ResourceCreation"
-	ConditionPhaseLoadTemplateData = "LoadTemplateData"
-	ConditionPhaseProcessTemplates = "ProcessTemplates"
-	ConditionPhaseApplyManifests   = "ApplyManifests"
-	ConditionPhasePostConditions   = "FeaturePostConditions"
-	ComponentType                  = "Component"
-	DSCIType                       = "DSCI"
+	ConditionPhaseFeatureCreated             = "FeatureCreated"
+	ConditionPhasePreConditions              = "FeaturePreConditions"
+	ConditionPhaseResourceCreation           = "ResourceCreation"
+	ConditionPhaseLoadTemplateData           = "LoadTemplateData"
+	ConditionPhaseProcessTemplates           = "ProcessTemplates"
+	ConditionPhaseApplyManifests             = "ApplyManifests"
+	ConditionPhasePostConditions             = "FeaturePostConditions"
+	ComponentType                  OwnerType = "Component"
+	DSCIType                       OwnerType = "DSCI"
 )
 
 func (s *FeatureTracker) ToOwnerReference() metav1.OwnerReference {
@@ -44,8 +46,8 @@ func (s *FeatureTracker) ToOwnerReference() metav1.OwnerReference {
 
 // Origin describes the type of object that created the related Feature to this FeatureTracker
 type Origin struct {
-	Type string `json:"type,omitempty"`
-	Name string `json:"name,omitempty"`
+	Type OwnerType `json:"type,omitempty"`
+	Name string    `json:"name,omitempty"`
 }
 
 // FeatureTrackerSpec defines the desired state of FeatureTracker.

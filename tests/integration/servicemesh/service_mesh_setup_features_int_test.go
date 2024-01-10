@@ -56,7 +56,7 @@ var _ = Describe("preconditions", func() {
 			namespace = envtestutil.AppendRandomNameTo(testFeatureName)
 
 			dsciSpec := newDSCInitializationSpec(namespace)
-			origin := newDefaultOrigin()
+			origin := envtestutil.NewOrigin(featurev1.DSCIType, "default")
 			var err error
 			testFeature, err = feature.CreateFeature(testFeatureName).
 				For(dsciSpec, origin).
@@ -102,7 +102,7 @@ var _ = Describe("preconditions", func() {
 
 		BeforeEach(func() {
 			dsciSpec = newDSCInitializationSpec("default")
-			origin = newDefaultOrigin()
+			origin = envtestutil.NewOrigin(featurev1.DSCIType, "default")
 		})
 
 		It("should successfully check for existing CRD", func() {
@@ -166,7 +166,7 @@ var _ = Describe("Ensuring service mesh is set up correctly", func() {
 
 		serviceMeshSpec.ControlPlane.Name = name
 		serviceMeshSpec.ControlPlane.Namespace = namespace
-		origin = newDefaultOrigin()
+		origin = envtestutil.NewOrigin(featurev1.DSCIType, "default")
 		serviceMeshCheck, err = feature.CreateFeature("datascience-project-migration").
 			For(dsciSpec, origin).
 			UsingConfig(envTest.Config).
@@ -210,7 +210,7 @@ var _ = Describe("Data Science Project Migration", func() {
 		objectCleaner = envtestutil.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
 		dsciSpec = newDSCInitializationSpec("default")
-		origin = newDefaultOrigin()
+		origin = envtestutil.NewOrigin(featurev1.DSCIType, "default")
 
 		var err error
 		migrationFeature, err = feature.CreateFeature("datascience-project-migration").
@@ -298,7 +298,7 @@ var _ = Describe("Cleanup operations", func() {
 			objectCleaner = envtestutil.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
 			dsciSpec = newDSCInitializationSpec(namespace)
-			origin = newDefaultOrigin()
+			origin = envtestutil.NewOrigin(featurev1.DSCIType, "default")
 
 			serviceMeshSpec = &dsciSpec.ServiceMesh
 
@@ -406,7 +406,7 @@ var _ = Describe("Alternate Manifest source", func() {
 			objectCleaner = envtestutil.CreateCleaner(envTestClient, envTest.Config, timeout, interval)
 
 			dsciSpec = newDSCInitializationSpec(namespace)
-			origin = newDefaultOrigin()
+			origin = envtestutil.NewOrigin(featurev1.DSCIType, "default")
 
 			serviceMeshSpec = &dsciSpec.ServiceMesh
 
@@ -544,14 +544,6 @@ func newDSCInitializationSpec(ns string) *dscv1.DSCInitializationSpec {
 	spec := dscv1.DSCInitializationSpec{}
 	spec.ApplicationsNamespace = ns
 	return &spec
-}
-
-func newDefaultOrigin() featurev1.Origin {
-	origin := featurev1.Origin{
-		Type: featurev1.DSCIType,
-		Name: "default",
-	}
-	return origin
 }
 
 // createSMCPInCluster uses dynamic client to create a dummy SMCP resource for testing

@@ -46,7 +46,7 @@ spec:
                 type: string
               origin:
                 description: Origin describes the type of object that created the
-                  related Feature to this FeatureTracker
+                  related Feature to this FeatureTracker.
                 properties:
                   name:
                     type: string

@@ -188,10 +188,15 @@ func (k *Kserve) configureServerless(instance *dsciv1.DSCInitializationSpec) err
 		case operatorv1.Unmanaged, operatorv1.Removed:
 			return fmt.Errorf("ServiceMesh is need to set to 'Managed' in DSCI CR, it is required by KServe serving field")
 		}
-		serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures, featurev1.Origin{
+		origin := featurev1.Origin{
 			Type: featurev1.ComponentType,
 			Name: k.GetComponentName(),
-		})
+		}
+		configureServerless := func(s *feature.FeaturesInitializer) error {
+			return k.configureServerlessFeatures(s, origin)
+		}
+
+		serverlessInitializer := feature.NewFeaturesInitializer(instance, configureServerless)
 
 		if err := serverlessInitializer.Prepare(); err != nil {
 			return err
@@ -205,10 +210,15 @@ func (k *Kserve) configureServerless(instance *dsciv1.DSCInitializationSpec) err
 }
 
 func (k *Kserve) removeServerlessFeatures(instance *dsciv1.DSCInitializationSpec) error {
-	serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures, featurev1.Origin{
+	origin := featurev1.Origin{
 		Type: featurev1.ComponentType,
 		Name: k.GetComponentName(),
-	})
+	}
+	configureServerless := func(s *feature.FeaturesInitializer) error {
+		return k.configureServerlessFeatures(s, origin)
+	}
+
+	serverlessInitializer := feature.NewFeaturesInitializer(instance, configureServerless)
 
 	if err := serverlessInitializer.Prepare(); err != nil {
 		return err

@@ -3,6 +3,7 @@ package kserve
 import (
 	"path"
 
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/serverless"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
@@ -14,9 +15,9 @@ const (
 	templatesDir            = "templates/serverless"
 )
 
-func (k *Kserve) configureServerlessFeatures(s *feature.FeaturesInitializer) error {
+func (k *Kserve) configureServerlessFeatures(s *feature.FeaturesInitializer, origin featurev1.Origin) error {
 	servingDeployment, err := feature.CreateFeature("serverless-serving-deployment").
-		For(s.DSCInitializationSpec, s.Origin).
+		For(s.DSCInitializationSpec, origin).
 		Manifests(
 			path.Join(templatesDir, "serving-install"),
 		).
@@ -37,7 +38,7 @@ func (k *Kserve) configureServerlessFeatures(s *feature.FeaturesInitializer) err
 	s.Features = append(s.Features, servingDeployment)
 
 	servingIstioGateways, err := feature.CreateFeature("serverless-serving-gateways").
-		For(s.DSCInitializationSpec, s.Origin).
+		For(s.DSCInitializationSpec, origin).
 		PreConditions(
 			// Check serverless is installed
 			feature.WaitForResourceToBeCreated(knativeServingNamespace, gvr.KnativeServing),

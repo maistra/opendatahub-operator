@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	infrav1 "github.com/opendatahub-io/opendatahub-operator/v2/infrastructure/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/serverless"
@@ -78,7 +77,7 @@ var _ = Describe("Serverless feature", func() {
 		namespace := envtestutil.AppendRandomNameTo(testFeatureName)
 
 		dsciSpec := newDSCInitializationSpec(namespace)
-		origin := newOrigin(featurev1.ComponentType, "kserve")
+		origin := newOrigin("kserve")
 		testFeature, err = feature.CreateFeature(testFeatureName).
 			For(dsciSpec, origin).
 			UsingConfig(envTest.Config).

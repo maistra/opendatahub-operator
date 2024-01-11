@@ -13,152 +13,154 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
 
-func defineServiceMeshFeatures(f *feature.FeaturesInitializer, origin featurev1.Origin) error {
-	serviceMeshSpec := f.ServiceMesh
+func defineServiceMeshFeatures(dscispec *dsciv1.DSCInitializationSpec, origin featurev1.Origin) feature.DefinedFeatures {
+	return func(s *feature.FeaturesInitializer) error {
+		serviceMeshSpec := dscispec.ServiceMesh
 
-	smcpCreation, errSmcp := feature.CreateFeature("service-mesh-control-plane-creation").
-		For(f.DSCInitializationSpec, origin).
-		Manifests(
-			path.Join(feature.ControlPlaneDir, "base", "control-plane.tmpl"),
-		).
-		PreConditions(
-			servicemesh.EnsureServiceMeshOperatorInstalled,
-			feature.CreateNamespaceIfNotExists(serviceMeshSpec.ControlPlane.Namespace),
-		).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-		).
-		Load()
-	if errSmcp != nil {
-		return errSmcp
-	}
-	f.Features = append(f.Features, smcpCreation)
-
-	if serviceMeshSpec.ControlPlane.MetricsCollection == "Istio" {
-		metricsCollection, errMetrics := feature.CreateFeature("service-mesh-monitoring").
-			For(f.DSCInitializationSpec, origin).
+		smcpCreation, errSmcp := feature.CreateFeature("service-mesh-control-plane-creation").
+			For(dscispec, origin).
 			Manifests(
-				path.Join(feature.MonitoringDir),
+				path.Join(feature.ControlPlaneDir, "base", "control-plane.tmpl"),
 			).
+			PreConditions(
+				servicemesh.EnsureServiceMeshOperatorInstalled,
+				feature.CreateNamespaceIfNotExists(serviceMeshSpec.ControlPlane.Namespace),
+			).
+			PostConditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+			).
+			Load()
+		if errSmcp != nil {
+			return errSmcp
+		}
+		s.Features = append(s.Features, smcpCreation)
+
+		if serviceMeshSpec.ControlPlane.MetricsCollection == "Istio" {
+			metricsCollection, errMetrics := feature.CreateFeature("service-mesh-monitoring").
+				For(dscispec, origin).
+				Manifests(
+					path.Join(feature.MonitoringDir),
+				).
+				PreConditions(
+					servicemesh.EnsureServiceMeshInstalled,
+				).
+				Load()
+			if errMetrics != nil {
+				return errMetrics
+			}
+
+			s.Features = append(s.Features, metricsCollection)
+		}
+
+		if oauth, err := feature.CreateFeature("service-mesh-control-plane-configure-oauth").
+			For(dscispec, origin).
+			Manifests(
+				path.Join(feature.ControlPlaneDir, "base"),
+				path.Join(feature.ControlPlaneDir, "oauth"),
+				path.Join(feature.ControlPlaneDir, "filters"),
+			).
+			WithResources(
+				servicemesh.DefaultValues,
+				servicemesh.SelfSignedCertificate,
+				servicemesh.EnvoyOAuthSecrets,
+			).
+			WithData(servicemesh.ClusterDetails, servicemesh.OAuthConfig).
 			PreConditions(
 				servicemesh.EnsureServiceMeshInstalled,
 			).
-			Load()
-		if errMetrics != nil {
-			return errMetrics
+			PostConditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+			).
+			OnDelete(
+				servicemesh.RemoveOAuthClient,
+				servicemesh.RemoveTokenVolumes,
+			).Load(); err != nil {
+			return err
+		} else {
+			s.Features = append(s.Features, oauth)
 		}
 
-		f.Features = append(f.Features, metricsCollection)
-	}
+		if cfMaps, err := feature.CreateFeature("shared-config-maps").
+			For(dscispec, origin).
+			WithResources(servicemesh.ConfigMaps).
+			Load(); err != nil {
+			return err
+		} else {
+			s.Features = append(s.Features, cfMaps)
+		}
 
-	if oauth, err := feature.CreateFeature("service-mesh-control-plane-configure-oauth").
-		For(f.DSCInitializationSpec, origin).
-		Manifests(
-			path.Join(feature.ControlPlaneDir, "base"),
-			path.Join(feature.ControlPlaneDir, "oauth"),
-			path.Join(feature.ControlPlaneDir, "filters"),
-		).
-		WithResources(
-			servicemesh.DefaultValues,
-			servicemesh.SelfSignedCertificate,
-			servicemesh.EnvoyOAuthSecrets,
-		).
-		WithData(servicemesh.ClusterDetails, servicemesh.OAuthConfig).
-		PreConditions(
-			servicemesh.EnsureServiceMeshInstalled,
-		).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-		).
-		OnDelete(
-			servicemesh.RemoveOAuthClient,
-			servicemesh.RemoveTokenVolumes,
-		).Load(); err != nil {
-		return err
-	} else {
-		f.Features = append(f.Features, oauth)
-	}
+		if serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
+			For(dscispec, origin).
+			Manifests(
+				path.Join(feature.ControlPlaneDir, "smm.tmpl"),
+				path.Join(feature.ControlPlaneDir, "namespace.patch.tmpl"),
+			).
+			WithData(servicemesh.ClusterDetails).
+			Load(); err != nil {
+			return err
+		} else {
+			s.Features = append(s.Features, serviceMesh)
+		}
 
-	if cfMaps, err := feature.CreateFeature("shared-config-maps").
-		For(f.DSCInitializationSpec, origin).
-		WithResources(servicemesh.ConfigMaps).
-		Load(); err != nil {
-		return err
-	} else {
-		f.Features = append(f.Features, cfMaps)
-	}
+		if gatewayRoute, err := feature.CreateFeature("service-mesh-create-gateway-route").
+			For(dscispec, origin).
+			Manifests(
+				path.Join(feature.ControlPlaneDir, "routing"),
+			).
+			WithData(servicemesh.ClusterDetails).
+			PostConditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+			).
+			Load(); err != nil {
+			return err
+		} else {
+			s.Features = append(s.Features, gatewayRoute)
+		}
 
-	if serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
-		For(f.DSCInitializationSpec, origin).
-		Manifests(
-			path.Join(feature.ControlPlaneDir, "smm.tmpl"),
-			path.Join(feature.ControlPlaneDir, "namespace.patch.tmpl"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		Load(); err != nil {
-		return err
-	} else {
-		f.Features = append(f.Features, serviceMesh)
-	}
+		if dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
+			For(dscispec, origin).
+			WithResources(servicemesh.MigratedDataScienceProjects).
+			Load(); err != nil {
+			return err
+		} else {
+			s.Features = append(s.Features, dataScienceProjects)
+		}
 
-	if gatewayRoute, err := feature.CreateFeature("service-mesh-create-gateway-route").
-		For(f.DSCInitializationSpec, origin).
-		Manifests(
-			path.Join(feature.ControlPlaneDir, "routing"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-		).
-		Load(); err != nil {
-		return err
-	} else {
-		f.Features = append(f.Features, gatewayRoute)
-	}
+		if extAuthz, err := feature.CreateFeature("service-mesh-control-plane-setup-external-authorization").
+			For(s.DSCInitializationSpec, origin).
+			Manifests(
+				path.Join(feature.AuthDir, "auth-smm.tmpl"),
+				path.Join(feature.AuthDir, "base"),
+				path.Join(feature.AuthDir, "rbac"),
+				path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
+			).
+			WithData(servicemesh.ClusterDetails).
+			PreConditions(
+				feature.EnsureCRDIsInstalled("authconfigs.authorino.kuadrant.io"),
+				servicemesh.EnsureServiceMeshInstalled,
+				feature.CreateNamespaceIfNotExists(serviceMeshSpec.Auth.Namespace),
+			).
+			PostConditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+				feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace),
+				func(f *feature.Feature) error {
+					// We do not have the control over deployment resource creation.
+					// It is created by Authorino operator using Authorino CR
+					//
+					// To make it part of Service Mesh we have to patch it with injection
+					// enabled instead, otherwise it will not have proxy pod injected.
+					return f.ApplyManifest(path.Join(feature.AuthDir, "deployment.injection.patch.tmpl"))
+				},
+			).
+			OnDelete(servicemesh.RemoveExtensionProvider).
+			Load(); err != nil {
+			return err
+		} else {
+			s.Features = append(s.Features, extAuthz)
+		}
 
-	if dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
-		For(f.DSCInitializationSpec, origin).
-		WithResources(servicemesh.MigratedDataScienceProjects).
-		Load(); err != nil {
-		return err
-	} else {
-		f.Features = append(f.Features, dataScienceProjects)
+		return nil
 	}
-
-	if extAuthz, err := feature.CreateFeature("service-mesh-control-plane-setup-external-authorization").
-		For(f.DSCInitializationSpec, origin).
-		Manifests(
-			path.Join(feature.AuthDir, "auth-smm.tmpl"),
-			path.Join(feature.AuthDir, "base"),
-			path.Join(feature.AuthDir, "rbac"),
-			path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		PreConditions(
-			feature.EnsureCRDIsInstalled("authconfigs.authorino.kuadrant.io"),
-			servicemesh.EnsureServiceMeshInstalled,
-			feature.CreateNamespaceIfNotExists(serviceMeshSpec.Auth.Namespace),
-		).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-			feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace),
-			func(f *feature.Feature) error {
-				// We do not have the control over deployment resource creation.
-				// It is created by Authorino operator using Authorino CR
-				//
-				// To make it part of Service Mesh we have to patch it with injection
-				// enabled instead, otherwise it will not have proxy pod injected.
-				return f.ApplyManifest(path.Join(feature.AuthDir, "deployment.injection.patch.tmpl"))
-			},
-		).
-		OnDelete(servicemesh.RemoveExtensionProvider).
-		Load(); err != nil {
-		return err
-	} else {
-		f.Features = append(f.Features, extAuthz)
-	}
-
-	return nil
 }
 
 func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCInitialization) error {
@@ -173,11 +175,7 @@ func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCI
 			Type: featurev1.DSCIType,
 			Name: instance.Name,
 		}
-		defineServiceMesh := func(s *feature.FeaturesInitializer) error {
-			return defineServiceMeshFeatures(s, origin)
-		}
-
-		serviceMeshInitializer := feature.NewFeaturesInitializer(&instance.Spec, defineServiceMesh)
+		serviceMeshInitializer := feature.NewFeaturesInitializer(&instance.Spec, defineServiceMeshFeatures(&instance.Spec, origin))
 		if err := serviceMeshInitializer.Prepare(); err != nil {
 			r.Log.Error(err, "failed configuring service mesh resources")
 			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed configuring service mesh resources")
@@ -208,11 +206,7 @@ func (r *DSCInitializationReconciler) removeServiceMesh(instance *dsciv1.DSCInit
 			Type: featurev1.DSCIType,
 			Name: instance.Name,
 		}
-		defineServiceMesh := func(s *feature.FeaturesInitializer) error {
-			return defineServiceMeshFeatures(s, origin)
-		}
-
-		serviceMeshInitializer := feature.NewFeaturesInitializer(&instance.Spec, defineServiceMesh)
+		serviceMeshInitializer := feature.NewFeaturesInitializer(&instance.Spec, defineServiceMeshFeatures(&instance.Spec, origin))
 		if err := serviceMeshInitializer.Prepare(); err != nil {
 			r.Log.Error(err, "failed configuring service mesh resources")
 			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed configuring service mesh resources")

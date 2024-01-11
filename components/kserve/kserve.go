@@ -192,11 +192,7 @@ func (k *Kserve) configureServerless(instance *dsciv1.DSCInitializationSpec) err
 			Type: featurev1.ComponentType,
 			Name: k.GetComponentName(),
 		}
-		configureServerless := func(s *feature.FeaturesInitializer) error {
-			return k.configureServerlessFeatures(s, origin)
-		}
-
-		serverlessInitializer := feature.NewFeaturesInitializer(instance, configureServerless)
+		serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures(instance, origin))
 
 		if err := serverlessInitializer.Prepare(); err != nil {
 			return err
@@ -214,11 +210,7 @@ func (k *Kserve) removeServerlessFeatures(instance *dsciv1.DSCInitializationSpec
 		Type: featurev1.ComponentType,
 		Name: k.GetComponentName(),
 	}
-	configureServerless := func(s *feature.FeaturesInitializer) error {
-		return k.configureServerlessFeatures(s, origin)
-	}
-
-	serverlessInitializer := feature.NewFeaturesInitializer(instance, configureServerless)
+	serverlessInitializer := feature.NewFeaturesInitializer(instance, k.configureServerlessFeatures(instance, origin))
 
 	if err := serverlessInitializer.Prepare(); err != nil {
 		return err

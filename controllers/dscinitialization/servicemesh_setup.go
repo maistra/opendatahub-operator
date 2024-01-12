@@ -52,124 +52,125 @@ func defineServiceMeshFeatures(dscispec *dsciv1.DSCInitializationSpec, origin fe
 			s.Features = append(s.Features, metricsCollection)
 		}
 
-	oauth, err := feature.CreateFeature("service-mesh-control-plane-configure-oauth").
-	  For(dscispec, origin).
-		Manifests(
-			path.Join(feature.ControlPlaneDir, "base"),
-			path.Join(feature.ControlPlaneDir, "oauth"),
-			path.Join(feature.ControlPlaneDir, "filters"),
-		).
-		WithResources(
-			servicemesh.DefaultValues,
-			servicemesh.SelfSignedCertificate,
-			servicemesh.EnvoyOAuthSecrets,
-		).
-		WithData(servicemesh.ClusterDetails, servicemesh.OAuthConfig).
-		PreConditions(
-			servicemesh.EnsureServiceMeshInstalled,
-		).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-		).
-		OnDelete(
-			servicemesh.RemoveOAuthClient,
-			servicemesh.RemoveTokenVolumes,
-		).Load()
+		oauth, err := feature.CreateFeature("service-mesh-control-plane-configure-oauth").
+			For(dscispec, origin).
+			Manifests(
+				path.Join(feature.ControlPlaneDir, "base"),
+				path.Join(feature.ControlPlaneDir, "oauth"),
+				path.Join(feature.ControlPlaneDir, "filters"),
+			).
+			WithResources(
+				servicemesh.DefaultValues,
+				servicemesh.SelfSignedCertificate,
+				servicemesh.EnvoyOAuthSecrets,
+			).
+			WithData(servicemesh.ClusterDetails, servicemesh.OAuthConfig).
+			PreConditions(
+				servicemesh.EnsureServiceMeshInstalled,
+			).
+			PostConditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+			).
+			OnDelete(
+				servicemesh.RemoveOAuthClient,
+				servicemesh.RemoveTokenVolumes,
+			).Load()
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+
+		s.Features = append(s.Features, oauth)
+
+		cfMaps, err := feature.CreateFeature("shared-config-maps").
+			For(dscispec, origin).
+			WithResources(servicemesh.ConfigMaps).
+			Load()
+
+		if err != nil {
+			return err
+		}
+
+		s.Features = append(s.Features, cfMaps)
+
+		serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
+			For(dscispec, origin).
+			Manifests(
+				path.Join(feature.ControlPlaneDir, "smm.tmpl"),
+				path.Join(feature.ControlPlaneDir, "namespace.patch.tmpl"),
+			).
+			WithData(servicemesh.ClusterDetails).
+			Load()
+		if err != nil {
+			return err
+		}
+
+		s.Features = append(s.Features, serviceMesh)
+
+		gatewayRoute, err := feature.CreateFeature("service-mesh-create-gateway-route").
+			For(dscispec, origin).
+			Manifests(
+				path.Join(feature.ControlPlaneDir, "routing"),
+			).
+			WithData(servicemesh.ClusterDetails).
+			PostConditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+			).
+			Load()
+		if err != nil {
+			return err
+		}
+
+		s.Features = append(s.Features, gatewayRoute)
+
+		dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
+			For(dscispec, origin).
+			WithResources(servicemesh.MigratedDataScienceProjects).
+			Load()
+
+		if err != nil {
+			return err
+		}
+
+		s.Features = append(s.Features, dataScienceProjects)
+
+		extAuthz, err := feature.CreateFeature("service-mesh-control-plane-setup-external-authorization").
+			For(dscispec, origin).
+			Manifests(
+				path.Join(feature.AuthDir, "auth-smm.tmpl"),
+				path.Join(feature.AuthDir, "base"),
+				path.Join(feature.AuthDir, "rbac"),
+				path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
+			).
+			WithData(servicemesh.ClusterDetails).
+			PreConditions(
+				feature.EnsureCRDIsInstalled("authconfigs.authorino.kuadrant.io"),
+				servicemesh.EnsureServiceMeshInstalled,
+				feature.CreateNamespaceIfNotExists(serviceMeshSpec.Auth.Namespace),
+			).
+			PostConditions(
+				feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+				feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace),
+				func(f *feature.Feature) error {
+					// We do not have the control over deployment resource creation.
+					// It is created by Authorino operator using Authorino CR
+					//
+					// To make it part of Service Mesh we have to patch it with injection
+					// enabled instead, otherwise it will not have proxy pod injected.
+					return f.ApplyManifest(path.Join(feature.AuthDir, "deployment.injection.patch.tmpl"))
+				},
+			).
+			OnDelete(servicemesh.RemoveExtensionProvider).
+			Load()
+
+		if err != nil {
+			return err
+		}
+
+		s.Features = append(s.Features, extAuthz)
+
+		return nil
 	}
-
-	f.Features = append(f.Features, oauth)
-
-	cfMaps, err := feature.CreateFeature("shared-config-maps").
-		For(dscispec, origin).
-		WithResources(servicemesh.ConfigMaps).
-		Load()
-
-	if err != nil {
-		return err
-	}
-
-	f.Features = append(f.Features, cfMaps)
-
-	serviceMesh, err := feature.CreateFeature("app-add-namespace-to-service-mesh").
-		For(dscispec, origin).
-		Manifests(
-			path.Join(feature.ControlPlaneDir, "smm.tmpl"),
-			path.Join(feature.ControlPlaneDir, "namespace.patch.tmpl"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		Load()
-	if err != nil {
-		return err
-	}
-
-	f.Features = append(f.Features, serviceMesh)
-
-	gatewayRoute, err := feature.CreateFeature("service-mesh-create-gateway-route").
-		For(dscispec, origin).
-		Manifests(
-			path.Join(feature.ControlPlaneDir, "routing"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-		).
-		Load()
-	if err != nil {
-		return err
-	}
-
-	f.Features = append(f.Features, gatewayRoute)
-
-	dataScienceProjects, err := feature.CreateFeature("app-migrate-data-science-projects").
-		For(dscispec, origin).
-		WithResources(servicemesh.MigratedDataScienceProjects).
-		Load()
-
-	if err != nil {
-		return err
-	}
-
-	f.Features = append(f.Features, dataScienceProjects)
-
-	extAuthz, err := feature.CreateFeature("service-mesh-control-plane-setup-external-authorization").
-		For(dscispec, origin).
-		Manifests(
-			path.Join(feature.AuthDir, "auth-smm.tmpl"),
-			path.Join(feature.AuthDir, "base"),
-			path.Join(feature.AuthDir, "rbac"),
-			path.Join(feature.AuthDir, "mesh-authz-ext-provider.patch.tmpl"),
-		).
-		WithData(servicemesh.ClusterDetails).
-		PreConditions(
-			feature.EnsureCRDIsInstalled("authconfigs.authorino.kuadrant.io"),
-			servicemesh.EnsureServiceMeshInstalled,
-			feature.CreateNamespaceIfNotExists(serviceMeshSpec.Auth.Namespace),
-		).
-		PostConditions(
-			feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-			feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace),
-			func(f *feature.Feature) error {
-				// We do not have the control over deployment resource creation.
-				// It is created by Authorino operator using Authorino CR
-				//
-				// To make it part of Service Mesh we have to patch it with injection
-				// enabled instead, otherwise it will not have proxy pod injected.
-				return f.ApplyManifest(path.Join(feature.AuthDir, "deployment.injection.patch.tmpl"))
-			},
-		).
-		OnDelete(servicemesh.RemoveExtensionProvider).
-		Load()
-
-	if err != nil {
-		return err
-	}
-
-	f.Features = append(f.Features, extAuthz)
-
-	return nil
 }
 
 func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCInitialization) error {

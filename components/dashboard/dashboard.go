@@ -121,7 +121,7 @@ func (d *Dashboard) ReconcileComponent(ctx context.Context,
 			}
 			// Deploy CRDs
 			if err := d.deployCRDsForPlatform(cli, owner, dscispec.ApplicationsNamespace, platform); err != nil {
-				return fmt.Errorf("failed to deploy %s crds %s: %v", ComponentName, PathCRDs, err)
+				return fmt.Errorf("failed to deploy %s crds %s: %w", ComponentName, PathCRDs, err)
 			}
 		}
 
@@ -131,7 +131,7 @@ func (d *Dashboard) ReconcileComponent(ctx context.Context,
 			}
 			// Deploy CRDs
 			if err := d.deployCRDsForPlatform(cli, owner, dscispec.ApplicationsNamespace, platform); err != nil {
-				return fmt.Errorf("failed to deploy %s crds %s: %v", ComponentNameSupported, PathCRDs, err)
+				return fmt.Errorf("failed to deploy %s crds %s: %w", ComponentNameSupported, PathCRDs, err)
 			}
 			// Apply RHODS specific configs
 			if err := d.applyRhodsSpecificConfigs(cli, owner, dscispec.ApplicationsNamespace, platform); err != nil {
@@ -209,7 +209,6 @@ func (d *Dashboard) ReconcileComponent(ctx context.Context,
 				return err
 			}
 		}
-
 		return nil
 	default:
 		return nil
@@ -345,7 +344,7 @@ func (d *Dashboard) cleanOauthClient(cli client.Client, dscispec *dsciv1.DSCInit
 			}
 		} else {
 			if err := cli.Delete(context.TODO(), oauthClientSecret); err != nil {
-				return fmt.Errorf("error deleting secret %s in namespace %s : %w", name, dscispec.ApplicationsNamespace, err)
+				return fmt.Errorf("error deleting oauth client secret: %w", err)
 			}
 		}
 	}
